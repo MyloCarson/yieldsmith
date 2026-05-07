@@ -33,7 +33,8 @@
       },
       {
         "selector": "variableLike",
-        "format": ["camelCase"]
+        "format": ["camelCase"],
+        "leadingUnderscore": "allow"
       },
       {
         "selector": "variable",
