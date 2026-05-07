@@ -37,7 +37,7 @@
       {
         "selector": "variable",
         "modifiers": ["const", "global"],
-        "format": ["UPPER_SNAKE_CASE", "camelCase"]
+        "format": ["UPPER_CASE", "camelCase"]
       }
     ],
     "no-console": [
