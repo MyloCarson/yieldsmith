@@ -18,5 +18,5 @@ global.console = {
   debug: jest.fn(),
   info: jest.fn(),
   warn: jest.fn(),
-  error: console.error
+  error: console.error,
 };
