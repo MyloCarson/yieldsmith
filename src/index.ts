@@ -1,0 +1,1 @@
+// Yieldsmith — entry point

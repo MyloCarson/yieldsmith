@@ -1,0 +1,90 @@
+{
+  "_comment": "Rate limiting configuration using Upstash Redis. Thresholds can be adjusted based on usage patterns.",
+
+  "provider": {
+    "type": "upstash",
+    "endpoint": "${UPSTASH_REDIS_REST_URL}",
+    "token": "${UPSTASH_REDIS_REST_TOKEN}"
+  },
+
+  "limits": {
+    "messages_per_minute": {
+      "max_requests": 10,
+      "window_seconds": 60,
+      "description": "Max messages a user can send per minute"
+    },
+    "api_calls_per_hour": {
+      "max_requests": 100,
+      "window_seconds": 3600,
+      "description": "Max API calls (recommendations, analysis) per hour"
+    },
+    "recommendations_per_day": {
+      "max_requests": 5,
+      "window_seconds": 86400,
+      "description": "Max recommendations requested per day"
+    },
+    "portfolio_updates_per_hour": {
+      "max_requests": 20,
+      "window_seconds": 3600,
+      "description": "Max portfolio sync operations per hour"
+    },
+    "alert_creations_per_day": {
+      "max_requests": 50,
+      "window_seconds": 86400,
+      "description": "Max new alerts created per day"
+    }
+  },
+
+  "strategies": {
+    "default": "sliding_window",
+    "types": {
+      "sliding_window": {
+        "algorithm": "Sliding window counter (Redis INCR with TTL)",
+        "pros": "Simple, accurate, memory efficient",
+        "cons": "Can briefly allow bursts at window boundaries"
+      },
+      "token_bucket": {
+        "algorithm": "Token bucket (refill tokens over time)",
+        "pros": "Smooth rate limiting, allows controlled bursts",
+        "cons": "Slightly more complex, more memory"
+      }
+    }
+  },
+
+  "enforcement": {
+    "enabled": true,
+    "on_limit_exceeded": "reject",
+    "log_events": true,
+    "notify_user": true,
+    "notification_message": "You've hit the rate limit. Please try again in a moment.",
+    "rejection_http_code": 429
+  },
+
+  "monitoring": {
+    "track_rejected_requests": true,
+    "alert_threshold": {
+      "consecutive_rejections": 3,
+      "rejected_in_hour": 10
+    },
+    "dashboard_enabled": true
+  },
+
+  "exemptions": {
+    "premium_users": {
+      "messages_per_minute": 30,
+      "api_calls_per_hour": 500,
+      "recommendations_per_day": 20,
+      "portfolio_updates_per_hour": 100
+    },
+    "admin_users": {
+      "apply_limits": false,
+      "description": "Admins bypass rate limiting"
+    }
+  },
+
+  "future_expansion": {
+    "dynamic_limits": "Adjust limits based on user subscription tier",
+    "gradual_backoff": "Increase wait time after repeated violations",
+    "per_endpoint_limits": "Different limits for different commands"
+  }
+}
