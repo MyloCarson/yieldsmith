@@ -3,8 +3,35 @@
  * Central export for all core pluggable interfaces
  *
  * Example:
- *   import { IAIProvider, INotificationProvider } from '@core';
+ *   import { IMarket, ICriterion, IAIProvider } from '@core';
  */
+
+// Shared types (import first — used by other core modules)
+export {
+  HealthCheckResult,
+  IMarket,
+  IMarketFactory,
+  MarketHours,
+  MarketConfig,
+  MarketCapabilities,
+} from "./market";
+
+// Criterion abstraction
+export {
+  ICriterion,
+  ICriterionFactory,
+  CriterionCategory,
+  CriterionContext,
+  CriterionStockData,
+  CriterionFinancials,
+  CriterionDividend,
+  CriterionTechnical,
+  CriterionHistorical,
+  CriterionPortfolioContext,
+  CriterionEvaluation,
+  CriterionMetadata,
+  CriterionThresholds,
+} from "./criterion";
 
 // AI provider abstraction
 export {

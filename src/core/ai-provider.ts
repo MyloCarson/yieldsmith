@@ -6,6 +6,7 @@
 
 import { StockSymbol, MarketId, Score, DateOnly, ConfidenceLevel } from "@/types/common";
 import { RiskTolerance } from "@/types/users";
+import { HealthCheckResult } from "./market";
 
 /**
  * AI provider implementation contract
@@ -332,16 +333,7 @@ export interface AICapabilities {
   concurrentRequests: number;
 }
 
-/**
- * Health check result
- */
-export interface HealthCheckResult {
-  healthy: boolean;
-  apiStatus: "operational" | "degraded" | "down";
-  lastCheck: Date;
-  responseTime?: number;
-  error?: string;
-}
+export { HealthCheckResult };
 
 /**
  * Rate limit status
