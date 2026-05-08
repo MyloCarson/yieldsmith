@@ -28,6 +28,7 @@ export class MockNotificationProvider extends BaseNotificationProvider {
     _priority?: AlertPriority,
     _options?: NotificationOptions
   ): Promise<DeliveryResult> {
+    this.ensureInitialized();
     this.sentMessages.push({ userId, title, message });
     return Promise.resolve(buildMockDeliveryResult());
   }
@@ -40,6 +41,7 @@ export class MockNotificationProvider extends BaseNotificationProvider {
     _priority?: AlertPriority,
     _options?: NotificationOptions
   ): Promise<DeliveryResult> {
+    this.ensureInitialized();
     this.sentMessages.push({ userId, title, message });
     return Promise.resolve(buildMockDeliveryResult());
   }
@@ -50,6 +52,7 @@ export class MockNotificationProvider extends BaseNotificationProvider {
     _priority?: AlertPriority,
     _options?: NotificationOptions
   ): Promise<DeliveryResult> {
+    this.ensureInitialized();
     this.sentMessages.push({ userId, title: content.title, message: content.description ?? "" });
     return Promise.resolve(buildMockDeliveryResult());
   }
@@ -118,7 +121,7 @@ export class MockNotificationProvider extends BaseNotificationProvider {
 
 function buildMockDeliveryResult(): DeliveryResult {
   return {
-    messageId: `mock-${Date.now()}`,
+    messageId: `mock-${crypto.randomUUID()}`,
     status: "sent",
     sentAt: new Date(),
     deliveryTimeMs: 0,

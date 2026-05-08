@@ -21,6 +21,8 @@ export interface TelegramNotificationProviderConfig {
 const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 const TELEGRAM_MAX_BUTTONS_PER_ROW = 8;
 const TELEGRAM_MAX_BUTTONS_TOTAL = 100;
+const TELEGRAM_MAX_CALLBACK_DATA_BYTES = 64;
+const SENT_AT_MAP_MAX_SIZE = 1000;
 
 export class TelegramNotificationProvider extends BaseNotificationProvider {
   readonly id = "telegram";
@@ -63,6 +65,14 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
     return `${emoji ? `${emoji} ` : ""}<b>${escapeHtml(title)}</b>\n\n${escapeHtml(message)}`;
   }
 
+  private recordSentAt(compositeId: string, sentAt: Date): void {
+    if (this.sentAtMap.size >= SENT_AT_MAP_MAX_SIZE) {
+      const oldestKey = this.sentAtMap.keys().next().value;
+      if (oldestKey !== undefined) this.sentAtMap.delete(oldestKey);
+    }
+    this.sentAtMap.set(compositeId, sentAt);
+  }
+
   async send(
     userId: string,
     title: string,
@@ -72,14 +82,15 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
   ): Promise<DeliveryResult> {
     try {
       const text = this.formatMessage(title, message, priority);
+      validateMessageLength(text);
       const sentAt = new Date();
       const sentMessage = await this.getBot().telegram.sendMessage(userId, text, {
         parse_mode: "HTML",
         ...(options?.silent ? { disable_notification: true } : {}),
       });
-      const messageId = String(sentMessage.message_id);
-      this.sentAtMap.set(messageId, sentAt);
-      return buildDeliveryResult(messageId, sentAt);
+      const compositeId = `${userId}:${sentMessage.message_id}`;
+      this.recordSentAt(compositeId, sentAt);
+      return buildDeliveryResult(compositeId, sentAt);
     } catch (error) {
       if (isInvalidChatError(error)) throw new InvalidRecipientError(userId);
       this.handleError("send", error);
@@ -96,6 +107,7 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
   ): Promise<DeliveryResult> {
     try {
       const text = this.formatMessage(title, message, priority);
+      validateMessageLength(text);
       const inlineKeyboard = buildInlineKeyboard(buttons);
       const sentAt = new Date();
       const sentMessage = await this.getBot().telegram.sendMessage(userId, text, {
@@ -103,9 +115,9 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
         reply_markup: { inline_keyboard: inlineKeyboard },
         ...(options?.silent ? { disable_notification: true } : {}),
       });
-      const messageId = String(sentMessage.message_id);
-      this.sentAtMap.set(messageId, sentAt);
-      return buildDeliveryResult(messageId, sentAt);
+      const compositeId = `${userId}:${sentMessage.message_id}`;
+      this.recordSentAt(compositeId, sentAt);
+      return buildDeliveryResult(compositeId, sentAt);
     } catch (error) {
       if (isInvalidChatError(error)) throw new InvalidRecipientError(userId);
       this.handleError("sendInteractive", error);
@@ -120,6 +132,7 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
   ): Promise<DeliveryResult> {
     try {
       const text = buildRichText(content, priority);
+      validateMessageLength(text);
       const inlineKeyboard = content.buttons ? buildInlineKeyboard(content.buttons) : undefined;
       const sentAt = new Date();
       const sentMessage = await this.getBot().telegram.sendMessage(userId, text, {
@@ -127,9 +140,9 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
         ...(inlineKeyboard ? { reply_markup: { inline_keyboard: inlineKeyboard } } : {}),
         ...(options?.silent ? { disable_notification: true } : {}),
       });
-      const messageId = String(sentMessage.message_id);
-      this.sentAtMap.set(messageId, sentAt);
-      return buildDeliveryResult(messageId, sentAt);
+      const compositeId = `${userId}:${sentMessage.message_id}`;
+      this.recordSentAt(compositeId, sentAt);
+      return buildDeliveryResult(compositeId, sentAt);
     } catch (error) {
       if (isInvalidChatError(error)) throw new InvalidRecipientError(userId);
       this.handleError("sendRich", error);
@@ -137,7 +150,13 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
   }
 
   getDeliveryStatus(messageId: string): Promise<DeliveryStatus> {
-    const sentAt = this.sentAtMap.get(messageId) ?? new Date();
+    const sentAt = this.sentAtMap.get(messageId);
+    if (!sentAt) {
+      throw new NotificationError(
+        "UNKNOWN_MESSAGE_ID",
+        `No tracking data for message "${messageId}"`
+      );
+    }
     return Promise.resolve({
       messageId,
       status: "sent",
@@ -219,7 +238,31 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+function validateMessageLength(text: string): void {
+  if (text.length > TELEGRAM_MAX_MESSAGE_LENGTH) {
+    throw new NotificationError(
+      "MESSAGE_TOO_LONG",
+      `Message length ${text.length} exceeds Telegram limit of ${TELEGRAM_MAX_MESSAGE_LENGTH} characters`
+    );
+  }
+}
+
 function buildInlineKeyboard(buttons: NotificationButton[]): InlineKeyboardButton[][] {
+  if (buttons.length > TELEGRAM_MAX_BUTTONS_TOTAL) {
+    throw new NotificationError(
+      "TOO_MANY_BUTTONS",
+      `Button count ${buttons.length} exceeds Telegram limit of ${TELEGRAM_MAX_BUTTONS_TOTAL}`
+    );
+  }
+  for (const button of buttons) {
+    const callbackData = button.callbackData ?? button.action;
+    if (!button.url && Buffer.byteLength(callbackData, "utf8") > TELEGRAM_MAX_CALLBACK_DATA_BYTES) {
+      throw new NotificationError(
+        "CALLBACK_DATA_TOO_LONG",
+        `Callback data for button "${button.label}" exceeds ${TELEGRAM_MAX_CALLBACK_DATA_BYTES} bytes`
+      );
+    }
+  }
   const allButtons = buttons.map((button) =>
     button.url
       ? Markup.button.url(button.label, button.url)

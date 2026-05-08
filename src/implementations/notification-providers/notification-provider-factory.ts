@@ -61,6 +61,14 @@ export class NotificationProviderFactory implements INotificationProviderFactory
         ] ?? {};
       const instance = new constructor(providerConfig);
 
+      if (instance.id !== providerType) {
+        throw new ProviderFactoryError(
+          "NotificationProvider",
+          providerType,
+          new Error(`Provider id mismatch: expected "${providerType}", got "${instance.id}"`)
+        );
+      }
+
       try {
         await instance.initialize();
         this.instances.set(providerType, instance);
@@ -105,7 +113,6 @@ export class NotificationProviderFactory implements INotificationProviderFactory
   }
 
   registerProvider(provider: INotificationProvider): void {
-    // Keyed by provider.id — must match the providerType used in createProvider/getCached.
     if (this.instances.has(provider.id)) return;
     this.instances.set(provider.id, provider);
   }
