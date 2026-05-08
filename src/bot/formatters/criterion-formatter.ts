@@ -54,9 +54,7 @@ function buildScoreBar(score: number): string {
   return "█".repeat(filled) + "░".repeat(5 - filled);
 }
 
-function groupByCategory(
-  evaluations: CriterionEvaluation[]
-): Map<string, CriterionEvaluation[]> {
+function groupByCategory(evaluations: CriterionEvaluation[]): Map<string, CriterionEvaluation[]> {
   const grouped = new Map<string, CriterionEvaluation[]>();
   for (const evaluation of evaluations) {
     const category = evaluation.metadata.category;
