@@ -12,7 +12,7 @@ export async function handleHelp(ctx: BotContext): Promise<void> {
       `/portfolio — View your current holdings\n` +
       `/add_holding &lt;SYMBOL&gt; &lt;QTY&gt; &lt;PRICE&gt; [&lt;DATE&gt;] — Add a stock (date: "today", "last Monday", etc.)\n` +
       `/remove_holding &lt;SYMBOL&gt; — Remove a stock from your portfolio\n\n` +
-      `<b>Coming soon — Portfolio</b>\n` +
+      `<b>Coming soon — Performance</b>\n` +
       `/performance — Portfolio returns and metrics\n\n` +
       `<b>Coming soon — Analysis</b>\n` +
       `/recommend — AI-powered recommendations\n\n` +

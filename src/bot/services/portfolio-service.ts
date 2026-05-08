@@ -1,6 +1,5 @@
-import { format } from "date-fns";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { TelegramUserId, StockSymbol } from "@/types/common";
+import { TelegramUserId, StockSymbol, MarketId } from "@/types/common";
 import { PortfolioHolding, PortfolioLot, CreateHoldingInput } from "@/types/portfolios";
 import { IStockDataProvider } from "@core/data-provider";
 import { safeDiv } from "@/utils/math";
@@ -77,12 +76,17 @@ export class PortfolioService {
     return holdings;
   }
 
-  async getLots(userId: TelegramUserId, symbol: StockSymbol): Promise<PortfolioLot[]> {
+  async getLots(
+    userId: TelegramUserId,
+    symbol: StockSymbol,
+    marketId: MarketId
+  ): Promise<PortfolioLot[]> {
     const result = await this.db
       .from("portfolio_lots")
       .select("*")
       .eq("user_id", userId)
       .eq("symbol", symbol)
+      .eq("market_id", marketId)
       .order("purchase_date", { ascending: true });
 
     if (result.error) throw new Error(`Failed to fetch lots: ${result.error.message}`);
@@ -106,12 +110,13 @@ export class PortfolioService {
 
     if (lotResult.error) throw new Error(`Failed to add lot: ${lotResult.error.message}`);
 
-    // 2. Re-aggregate all lots for this symbol → upsert into portfolios
+    // 2. Re-aggregate all lots for this symbol + market → upsert into portfolios
     const lotsResult = await this.db
       .from("portfolio_lots")
       .select("quantity, purchase_price, purchase_date")
       .eq("user_id", userId)
-      .eq("symbol", input.symbol);
+      .eq("symbol", input.symbol)
+      .eq("market_id", input.market_id);
 
     if (lotsResult.error) throw new Error(`Failed to aggregate lots: ${lotsResult.error.message}`);
 
@@ -134,7 +139,6 @@ export class PortfolioService {
           purchase_price: weightedPrice,
           purchase_date: earliestDate,
           is_active: true,
-          updated_at: format(new Date(), "yyyy-MM-dd'T'HH:mm:ssxxx"),
         },
         { onConflict: "user_id,symbol,market_id" }
       )
@@ -146,12 +150,17 @@ export class PortfolioService {
     return toHolding(upsertResult.data);
   }
 
-  async removeHolding(userId: TelegramUserId, symbol: StockSymbol): Promise<void> {
+  async removeHolding(
+    userId: TelegramUserId,
+    symbol: StockSymbol,
+    marketId: MarketId
+  ): Promise<void> {
     const lotResult = await this.db
       .from("portfolio_lots")
       .delete()
       .eq("user_id", userId)
-      .eq("symbol", symbol);
+      .eq("symbol", symbol)
+      .eq("market_id", marketId);
 
     if (lotResult.error) throw new Error(`Failed to remove lots: ${lotResult.error.message}`);
 
@@ -159,7 +168,8 @@ export class PortfolioService {
       .from("portfolios")
       .delete()
       .eq("user_id", userId)
-      .eq("symbol", symbol);
+      .eq("symbol", symbol)
+      .eq("market_id", marketId);
 
     if (portfolioResult.error)
       throw new Error(`Failed to remove holding: ${portfolioResult.error.message}`);
@@ -167,13 +177,15 @@ export class PortfolioService {
 
   async getHoldingBySymbol(
     userId: TelegramUserId,
-    symbol: StockSymbol
+    symbol: StockSymbol,
+    marketId: MarketId
   ): Promise<PortfolioHolding | null> {
     const result = await this.db
       .from("portfolios")
       .select("*")
       .eq("user_id", userId)
       .eq("symbol", symbol)
+      .eq("market_id", marketId)
       .eq("is_active", true)
       .maybeSingle();
 

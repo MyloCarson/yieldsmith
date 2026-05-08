@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { BotContext } from "../types";
 import { PortfolioService } from "../services/portfolio-service";
 import { formatAddHolding } from "../formatters/portfolio-formatter";
+import { escapeHtml } from "@/utils/html";
 import { TelegramUserId, StockSymbol, MarketId } from "@/types/common";
 
 export function createAddHoldingHandler(portfolioService: PortfolioService) {
@@ -58,17 +59,19 @@ export function createAddHoldingHandler(portfolioService: PortfolioService) {
 
     const purchaseDate = format(parsedDate, "yyyy-MM-dd");
 
-    await ctx.replyWithHTML(`<b>➕ Adding ${symbol}...</b>`);
+    const marketId = "ngx" as MarketId;
+
+    await ctx.replyWithHTML(`<b>➕ Adding ${escapeHtml(String(symbol))}...</b>`);
 
     await portfolioService.addHolding(userId, {
       symbol,
-      market_id: "ngx" as MarketId,
+      market_id: marketId,
       quantity,
       purchase_price: purchasePrice,
       purchase_date: purchaseDate,
     });
 
-    const lots = await portfolioService.getLots(userId, symbol);
+    const lots = await portfolioService.getLots(userId, symbol, marketId);
     await ctx.replyWithHTML(formatAddHolding(symbol, quantity, purchasePrice, lots.length));
   };
 }

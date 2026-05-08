@@ -2,7 +2,7 @@ import { BotContext } from "../types";
 import { PortfolioService } from "../services/portfolio-service";
 import { formatRemoveHolding } from "../formatters/portfolio-formatter";
 import { escapeHtml } from "@/utils/html";
-import { TelegramUserId, StockSymbol } from "@/types/common";
+import { TelegramUserId, StockSymbol, MarketId } from "@/types/common";
 
 export function createRemoveHoldingHandler(portfolioService: PortfolioService) {
   return async (ctx: BotContext): Promise<void> => {
@@ -22,14 +22,15 @@ export function createRemoveHoldingHandler(portfolioService: PortfolioService) {
     }
 
     const symbol = symbolInput.toUpperCase() as StockSymbol;
+    const marketId = "ngx" as MarketId;
 
-    const existing = await portfolioService.getHoldingBySymbol(userId, symbol);
+    const existing = await portfolioService.getHoldingBySymbol(userId, symbol, marketId);
     if (!existing) {
       await ctx.replyWithHTML(`<b>${escapeHtml(String(symbol))}</b> is not in your portfolio.`);
       return;
     }
 
-    await portfolioService.removeHolding(userId, symbol);
+    await portfolioService.removeHolding(userId, symbol, marketId);
     await ctx.replyWithHTML(formatRemoveHolding(String(symbol)));
   };
 }

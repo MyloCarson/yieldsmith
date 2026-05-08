@@ -19,9 +19,9 @@ CREATE TABLE portfolio_lots (
   CONSTRAINT portfolio_lots_price_positive CHECK (purchase_price > 0)
 );
 
-CREATE INDEX idx_portfolio_lots_user_id ON portfolio_lots(user_id);
-CREATE INDEX idx_portfolio_lots_user_symbol ON portfolio_lots(user_id, symbol);
-CREATE INDEX idx_portfolio_lots_created_at ON portfolio_lots(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_portfolio_lots_user_id ON portfolio_lots(user_id);
+CREATE INDEX IF NOT EXISTS idx_portfolio_lots_user_symbol ON portfolio_lots(user_id, symbol);
+CREATE INDEX IF NOT EXISTS idx_portfolio_lots_created_at ON portfolio_lots(created_at DESC);
 
 ALTER TABLE portfolio_lots ENABLE ROW LEVEL SECURITY;
 
