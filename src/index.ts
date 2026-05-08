@@ -1,3 +1,6 @@
+import * as dotenv from "dotenv";
+dotenv.config();
+
 import { TelegramBot } from "./bot/telegram-bot";
 import { parseAllowedUserIds } from "./bot/middleware/auth.middleware";
 import { StockService } from "./bot/services/stock-service";
