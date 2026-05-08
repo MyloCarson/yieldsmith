@@ -13,6 +13,7 @@ import { CriterionContext, CriterionEvaluation, CriterionThresholds } from "@cor
 import { Score } from "@/types/common";
 import { CriterionValidationError } from "@core/errors";
 import { GrowthCriterion } from "./base-criterion";
+import { toPercent } from "@/utils/math";
 
 /**
  * ROE criterion configuration
@@ -98,7 +99,7 @@ export class ROECriterion extends GrowthCriterion {
     const thresholds = this.getThresholds(context);
 
     return Promise.resolve(
-      this.createEvaluation(context, isAcceptable, score, roe * 100, explanation, thresholds)
+      this.createEvaluation(context, isAcceptable, score, toPercent(roe), explanation, thresholds)
     );
   }
 
@@ -109,9 +110,9 @@ export class ROECriterion extends GrowthCriterion {
     return {
       name: this.name,
       description: "Return on Equity (Net Income / Equity)",
-      min: this.config.minROE * 100,
-      max: this.config.maxROE * 100,
-      target: this.config.targetROE * 100,
+      min: toPercent(this.config.minROE),
+      max: toPercent(this.config.maxROE),
+      target: toPercent(this.config.targetROE),
       unit: "%",
     };
   }

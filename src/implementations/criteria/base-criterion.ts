@@ -20,6 +20,7 @@ import {
 } from "@core/criterion";
 import { Score } from "@/types/common";
 import { CriterionValidationError } from "@core/errors";
+import { calcCAGR, safeDiv, toPercent, round as decRound } from "@/utils/math";
 
 /**
  * Abstract base class for all criteria
@@ -139,8 +140,7 @@ export abstract class BaseCriterion implements ICriterion {
    * Safe percentage calculation
    */
   protected safePercent(actual: number, expected: number): number {
-    if (expected === 0) return 0;
-    return (actual / expected) * 100;
+    return toPercent(safeDiv(actual, expected));
   }
 
   /**
@@ -191,7 +191,7 @@ export abstract class BaseCriterion implements ICriterion {
    * Round number to decimal places
    */
   protected round(value: number, decimals: number = 2): number {
-    return Number(`${Math.round(Number(`${value}e${decimals}`))}e-${decimals}`);
+    return decRound(value, decimals);
   }
 }
 
@@ -226,9 +226,7 @@ export abstract class DividendCriterion extends BaseCriterion {
     }
 
     const years = Math.max(1, dividends.length / 4); // Assume quarterly dividends
-    const cagr = Math.pow(newest.dividend_per_share / oldest.dividend_per_share, 1 / years) - 1;
-
-    return isFinite(cagr) ? cagr : 0;
+    return calcCAGR(oldest.dividend_per_share, newest.dividend_per_share, years);
   }
 
   /**
@@ -253,7 +251,7 @@ export abstract class ValuationCriterion extends BaseCriterion {
    */
   protected calculatePEG(peRatio: number, earningsGrowth: number): number {
     if (earningsGrowth <= 0) return Infinity;
-    return peRatio / (earningsGrowth * 100);
+    return safeDiv(peRatio, toPercent(earningsGrowth));
   }
 
   /**
@@ -317,9 +315,7 @@ export abstract class GrowthCriterion extends BaseCriterion {
    * Calculate compound annual growth rate
    */
   protected calculateCAGR(startValue: number, endValue: number, years: number): number {
-    if (startValue <= 0 || years <= 0) return 0;
-    const cagr = Math.pow(endValue / startValue, 1 / years) - 1;
-    return isFinite(cagr) ? cagr : 0;
+    return calcCAGR(startValue, endValue, years);
   }
 
   /**

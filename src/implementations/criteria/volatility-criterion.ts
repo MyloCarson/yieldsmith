@@ -13,6 +13,7 @@ import { CriterionContext, CriterionEvaluation, CriterionThresholds } from "@cor
 import { Score } from "@/types/common";
 import { CriterionValidationError } from "@core/errors";
 import { RiskCriterion } from "./base-criterion";
+import { toPercent } from "@/utils/math";
 
 /**
  * Volatility criterion configuration
@@ -62,7 +63,7 @@ export class VolatilityCriterion extends RiskCriterion {
         context,
         isAcceptable,
         score,
-        volatility * 100,
+        toPercent(volatility),
         explanation,
         this.getThresholds()
       )
@@ -73,9 +74,9 @@ export class VolatilityCriterion extends RiskCriterion {
     return {
       name: this.name,
       description: "Annualized volatility (%)",
-      min: this.config.minVolatility * 100,
-      max: this.config.maxVolatility * 100,
-      target: this.config.targetVolatility * 100,
+      min: toPercent(this.config.minVolatility),
+      max: toPercent(this.config.maxVolatility),
+      target: toPercent(this.config.targetVolatility),
       unit: "%",
     };
   }
