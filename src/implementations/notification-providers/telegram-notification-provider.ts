@@ -10,7 +10,6 @@ import {
   NotificationCapabilities,
   HealthCheckResult,
 } from "@core/notification-provider";
-import { NotificationProviderType } from "@/types/notifications";
 import { AlertPriority } from "@/types/alerts";
 import { NotificationError, InvalidRecipientError } from "@core/errors";
 import { BaseNotificationProvider } from "./base-notification-provider";
@@ -21,13 +20,15 @@ export interface TelegramNotificationProviderConfig {
 
 const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 const TELEGRAM_MAX_BUTTONS_PER_ROW = 8;
+const TELEGRAM_MAX_BUTTONS_TOTAL = 100;
 
 export class TelegramNotificationProvider extends BaseNotificationProvider {
-  readonly id: NotificationProviderType = "telegram";
+  readonly id = "telegram";
   readonly name = "Telegram";
 
   private readonly botToken: string | undefined;
   private bot: Telegraf | null = null;
+  private readonly sentAtMap = new Map<string, Date>();
 
   constructor(config?: TelegramNotificationProviderConfig) {
     super();
@@ -71,11 +72,14 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
   ): Promise<DeliveryResult> {
     try {
       const text = this.formatMessage(title, message, priority);
+      const sentAt = new Date();
       const sentMessage = await this.getBot().telegram.sendMessage(userId, text, {
         parse_mode: "HTML",
         ...(options?.silent ? { disable_notification: true } : {}),
       });
-      return buildDeliveryResult(String(sentMessage.message_id));
+      const messageId = String(sentMessage.message_id);
+      this.sentAtMap.set(messageId, sentAt);
+      return buildDeliveryResult(messageId, sentAt);
     } catch (error) {
       if (isInvalidChatError(error)) throw new InvalidRecipientError(userId);
       this.handleError("send", error);
@@ -93,12 +97,15 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
     try {
       const text = this.formatMessage(title, message, priority);
       const inlineKeyboard = buildInlineKeyboard(buttons);
+      const sentAt = new Date();
       const sentMessage = await this.getBot().telegram.sendMessage(userId, text, {
         parse_mode: "HTML",
         reply_markup: { inline_keyboard: inlineKeyboard },
         ...(options?.silent ? { disable_notification: true } : {}),
       });
-      return buildDeliveryResult(String(sentMessage.message_id));
+      const messageId = String(sentMessage.message_id);
+      this.sentAtMap.set(messageId, sentAt);
+      return buildDeliveryResult(messageId, sentAt);
     } catch (error) {
       if (isInvalidChatError(error)) throw new InvalidRecipientError(userId);
       this.handleError("sendInteractive", error);
@@ -114,12 +121,15 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
     try {
       const text = buildRichText(content, priority);
       const inlineKeyboard = content.buttons ? buildInlineKeyboard(content.buttons) : undefined;
+      const sentAt = new Date();
       const sentMessage = await this.getBot().telegram.sendMessage(userId, text, {
         parse_mode: "HTML",
         ...(inlineKeyboard ? { reply_markup: { inline_keyboard: inlineKeyboard } } : {}),
         ...(options?.silent ? { disable_notification: true } : {}),
       });
-      return buildDeliveryResult(String(sentMessage.message_id));
+      const messageId = String(sentMessage.message_id);
+      this.sentAtMap.set(messageId, sentAt);
+      return buildDeliveryResult(messageId, sentAt);
     } catch (error) {
       if (isInvalidChatError(error)) throw new InvalidRecipientError(userId);
       this.handleError("sendRich", error);
@@ -127,11 +137,11 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
   }
 
   getDeliveryStatus(messageId: string): Promise<DeliveryStatus> {
-    // Telegram doesn't expose read receipts — return sent status
+    const sentAt = this.sentAtMap.get(messageId) ?? new Date();
     return Promise.resolve({
       messageId,
       status: "sent",
-      sentAt: new Date(),
+      sentAt,
       retryable: false,
       attempts: 1,
     });
@@ -141,7 +151,8 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
     try {
       await this.getBot().telegram.sendChatAction(recipientId, "typing");
       return true;
-    } catch {
+    } catch (error) {
+      if (error instanceof NotificationError) throw error;
       return false;
     }
   }
@@ -152,7 +163,7 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
       remaining: 30,
       total: 30,
       resetAt: new Date(Date.now() + 1_000),
-      percentage: 100,
+      percentage: 0,
       windowSeconds: 1,
     });
   }
@@ -168,8 +179,7 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
         healthy: !!botInfo.id,
         status: "operational",
         lastCheck: new Date(),
-        details: { botUsername: botInfo.username },
-      } as HealthCheckResult & { details?: Record<string, unknown> };
+      };
     } catch (error) {
       return {
         healthy: false,
@@ -190,7 +200,7 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
       supportsReactions: false,
       maxTitleLength: 200,
       maxMessageLength: TELEGRAM_MAX_MESSAGE_LENGTH,
-      maxButtonsPerMessage: TELEGRAM_MAX_BUTTONS_PER_ROW,
+      maxButtonsPerMessage: TELEGRAM_MAX_BUTTONS_TOTAL,
       supportsBatching: false,
       supportsAggregation: false,
       supportsThreading: false,
@@ -210,12 +220,16 @@ function escapeHtml(text: string): string {
 }
 
 function buildInlineKeyboard(buttons: NotificationButton[]): InlineKeyboardButton[][] {
-  const row = buttons.map((button) =>
+  const allButtons = buttons.map((button) =>
     button.url
       ? Markup.button.url(button.label, button.url)
       : Markup.button.callback(button.label, button.callbackData ?? button.action)
   );
-  return Markup.inlineKeyboard(row).reply_markup.inline_keyboard;
+  const rows: (typeof allButtons)[] = [];
+  for (let index = 0; index < allButtons.length; index += TELEGRAM_MAX_BUTTONS_PER_ROW) {
+    rows.push(allButtons.slice(index, index + TELEGRAM_MAX_BUTTONS_PER_ROW));
+  }
+  return Markup.inlineKeyboard(rows).reply_markup.inline_keyboard;
 }
 
 function buildRichText(content: RichNotificationContent, priority?: AlertPriority): string {
@@ -243,11 +257,11 @@ function buildRichText(content: RichNotificationContent, priority?: AlertPriorit
   return lines.join("\n");
 }
 
-function buildDeliveryResult(messageId: string): DeliveryResult {
+function buildDeliveryResult(messageId: string, sentAt: Date): DeliveryResult {
   return {
     messageId,
     status: "sent",
-    sentAt: new Date(),
+    sentAt,
     deliveryTimeMs: 0,
   };
 }

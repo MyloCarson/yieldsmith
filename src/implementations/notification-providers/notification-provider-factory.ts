@@ -105,6 +105,7 @@ export class NotificationProviderFactory implements INotificationProviderFactory
   }
 
   registerProvider(provider: INotificationProvider): void {
+    // Keyed by provider.id — must match the providerType used in createProvider/getCached.
     if (this.instances.has(provider.id)) return;
     this.instances.set(provider.id, provider);
   }

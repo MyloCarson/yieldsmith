@@ -9,12 +9,11 @@ import {
   NotificationCapabilities,
   HealthCheckResult,
 } from "@core/notification-provider";
-import { NotificationProviderType } from "@/types/notifications";
 import { AlertPriority } from "@/types/alerts";
 import { NotificationError, ConfigurationError } from "@core/errors";
 
 export abstract class BaseNotificationProvider implements INotificationProvider {
-  abstract readonly id: NotificationProviderType;
+  abstract readonly id: string;
   abstract readonly name: string;
 
   protected initialized = false;

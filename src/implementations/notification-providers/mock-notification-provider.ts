@@ -8,12 +8,11 @@ import {
   NotificationCapabilities,
   HealthCheckResult,
 } from "@core/notification-provider";
-import { NotificationProviderType } from "@/types/notifications";
 import { AlertPriority } from "@/types/alerts";
 import { BaseNotificationProvider } from "./base-notification-provider";
 
 export class MockNotificationProvider extends BaseNotificationProvider {
-  readonly id = "telegram" as NotificationProviderType;
+  readonly id = "mock";
   readonly name = "Mock Notification Provider";
 
   private sentMessages: Array<{ userId: string; title: string; message: string }> = [];
@@ -75,7 +74,7 @@ export class MockNotificationProvider extends BaseNotificationProvider {
       remaining: 9999,
       total: 9999,
       resetAt: new Date(Date.now() + 3_600_000),
-      percentage: 100,
+      percentage: 0,
       windowSeconds: 3600,
     });
   }
