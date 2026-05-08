@@ -5,6 +5,21 @@
 import { TelegramUserId, UUID, StockSymbol, MarketId, DateOnly, Percentage } from "./common";
 
 /**
+ * Individual purchase lot (one row per buy transaction)
+ */
+export interface PortfolioLot {
+  id: UUID;
+  user_id: TelegramUserId;
+  symbol: StockSymbol;
+  market_id: MarketId;
+  quantity: number;
+  purchase_price: number;
+  purchase_date: DateOnly;
+  notes?: string;
+  created_at: Date;
+}
+
+/**
  * Portfolio holding (a single stock position)
  */
 export interface PortfolioHolding {
