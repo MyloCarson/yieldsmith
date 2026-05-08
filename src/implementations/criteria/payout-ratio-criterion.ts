@@ -13,6 +13,7 @@ import { CriterionContext, CriterionEvaluation, CriterionThresholds } from "@cor
 import { Score } from "@/types/common";
 import { CriterionValidationError } from "@core/errors";
 import { DividendCriterion } from "./base-criterion";
+import { toPercent } from "@/utils/math";
 
 /**
  * Payout Ratio criterion configuration
@@ -107,7 +108,7 @@ export class PayoutRatioCriterion extends DividendCriterion {
         context,
         isAcceptable,
         score,
-        payoutRatio * 100,
+        toPercent(payoutRatio),
         explanation,
         thresholds
       )
@@ -121,9 +122,9 @@ export class PayoutRatioCriterion extends DividendCriterion {
     return {
       name: this.name,
       description: "Dividend payout ratio (Dividends / Net Income)",
-      min: this.config.minPayoutRatio * 100,
-      max: this.config.maxPayoutRatio * 100,
-      target: this.config.targetPayoutRatio * 100,
+      min: toPercent(this.config.minPayoutRatio),
+      max: toPercent(this.config.maxPayoutRatio),
+      target: toPercent(this.config.targetPayoutRatio),
       unit: "%",
     };
   }

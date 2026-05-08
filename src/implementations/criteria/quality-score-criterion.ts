@@ -13,6 +13,7 @@ import { CriterionContext, CriterionEvaluation, CriterionThresholds } from "@cor
 import { Score } from "@/types/common";
 import { CriterionValidationError } from "@core/errors";
 import { GrowthCriterion } from "./base-criterion";
+import { toPercent } from "@/utils/math";
 
 /**
  * Quality Score Criterion Implementation
@@ -67,7 +68,7 @@ export class QualityScoreCriterion extends GrowthCriterion {
         context,
         isAcceptable,
         score,
-        qualityScore * 100,
+        toPercent(qualityScore),
         explanation,
         this.getThresholds()
       )
@@ -78,9 +79,9 @@ export class QualityScoreCriterion extends GrowthCriterion {
     return {
       name: this.name,
       description: "Quality Score (0-100)",
-      min: this.minQualityScore * 100,
+      min: toPercent(this.minQualityScore),
       max: 100,
-      target: this.targetQualityScore * 100,
+      target: toPercent(this.targetQualityScore),
       unit: "%",
     };
   }

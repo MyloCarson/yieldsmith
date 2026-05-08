@@ -13,6 +13,7 @@ import { CriterionContext, CriterionEvaluation, CriterionThresholds } from "@cor
 import { Score } from "@/types/common";
 import { CriterionValidationError } from "@core/errors";
 import { GrowthCriterion } from "./base-criterion";
+import { toPercent } from "@/utils/math";
 
 /**
  * Earnings Growth criterion configuration
@@ -67,7 +68,7 @@ export class EarningsGrowthCriterion extends GrowthCriterion {
         context,
         isAcceptable,
         score,
-        cagr * 100,
+        toPercent(cagr),
         explanation,
         this.getThresholds()
       )
@@ -78,9 +79,9 @@ export class EarningsGrowthCriterion extends GrowthCriterion {
     return {
       name: this.name,
       description: "Earnings CAGR (%)",
-      min: this.config.minGrowthCAGR * 100,
-      max: this.config.maxGrowthCAGR * 100,
-      target: this.config.targetGrowthCAGR * 100,
+      min: toPercent(this.config.minGrowthCAGR),
+      max: toPercent(this.config.maxGrowthCAGR),
+      target: toPercent(this.config.targetGrowthCAGR),
       unit: "%",
     };
   }

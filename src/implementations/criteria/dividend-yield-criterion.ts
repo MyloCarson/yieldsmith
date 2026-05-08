@@ -12,6 +12,7 @@ import { CriterionContext, CriterionEvaluation, CriterionThresholds } from "@cor
 import { Score } from "@/types/common";
 import { CriterionValidationError } from "@core/errors";
 import { DividendCriterion } from "./base-criterion";
+import { toPercent, multiply } from "@/utils/math";
 
 /**
  * Dividend yield criterion configuration
@@ -81,10 +82,10 @@ export class DividendYieldCriterion extends DividendCriterion {
     this.validateContext(context);
 
     const stockData = context.stockData!;
-    const grossYield = (stockData.dividendYield || 0) * 100;
+    const grossYield = toPercent(stockData.dividendYield || 0);
 
     const withholdingTax = this.config.withholdingTaxRate ?? 0.1;
-    const netYield = grossYield * (1 - withholdingTax);
+    const netYield = multiply(grossYield, 1 - withholdingTax);
 
     const thresholds = this.getThresholds(context);
 
@@ -219,7 +220,7 @@ adjusted for market conditions.
       else trend = "stable";
     }
 
-    return { trend, cagr: cagr * 100, consistency };
+    return { trend, cagr: toPercent(cagr), consistency };
   }
 
   /**
