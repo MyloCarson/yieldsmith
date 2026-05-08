@@ -106,6 +106,17 @@ export class MockAIProvider extends BaseAIProvider {
   }
 
   assessPortfolioRisk(portfolio: PortfolioStock[]): Promise<RiskAssessment> {
+    if (portfolio.length === 0) {
+      return Promise.resolve({
+        overallRisk: "low",
+        sectorConcentration: 0,
+        marketConcentration: 0,
+        correlationRisk: "No holdings to assess.",
+        diversificationScore: 0 as Score,
+        recommendations: ["Add holdings to assess portfolio risk."],
+      });
+    }
+
     const sectors = new Set(portfolio.map((s) => s.sector ?? "unknown"));
     const sectorConcentration = 1 / sectors.size;
 

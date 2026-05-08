@@ -133,7 +133,7 @@ Symbol: ${symbol} (${marketId})
 Criteria results: ${JSON.stringify(criteria, null, 2)}
 Context: ${JSON.stringify(context, null, 2)}
 
-Return JSON with: symbol, marketId, recommendation (buy|hold|sell), recommendedAmount, confidence (low|medium|high|very_high), score (0-1), reasoning{fundamental,technical,dividend,valuation,overall}, keyStrengths[], keyConcerns[], targetPrice, upside, downside, investmentHorizon, alternatives[], metadata{modelUsed,analysisDate,dataSourcesUsed[],assumptions[]}.`;
+Return JSON with: symbol, marketId, recommendation (buy|hold|sell), recommendedAmount, confidence (low|medium|high), score (0-1), reasoning{fundamental,technical,dividend,valuation,overall}, keyStrengths[], keyConcerns[], targetPrice, upside, downside, investmentHorizon, alternatives[], metadata{modelUsed,analysisDate,dataSourcesUsed[],assumptions[]}.`;
 
       const raw = await this.ask(prompt);
       const parsed = this.parseJSON<AIRecommendation>(raw);
