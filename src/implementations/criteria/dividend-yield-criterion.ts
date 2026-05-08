@@ -81,6 +81,17 @@ export class DividendYieldCriterion extends DividendCriterion {
   evaluate(context: CriterionContext): Promise<CriterionEvaluation> {
     this.validateContext(context);
 
+    // Recency check: disqualify if no dividend paid in the last 14 months
+    const recency = this.checkDividendRecency(context);
+    if (!recency.isRecent) {
+      const msg = recency.lastPaymentDate
+        ? `Last dividend was paid ${recency.monthsAgo} months ago (${recency.lastPaymentDate}) — too long ago. We require a dividend within the last 12 months.`
+        : "No dividend payment on record. This stock does not qualify as a dividend payer.";
+      return Promise.resolve(
+        this.createEvaluation(context, false, 0 as Score, 0, msg, this.getThresholds(context))
+      );
+    }
+
     const stockData = context.stockData!;
     const grossYield = toPercent(stockData.dividendYield || 0);
 
@@ -158,6 +169,41 @@ adjusted for market conditions.
   }
 
   // ============== Private Helper Methods ==============
+
+  private checkDividendRecency(context: CriterionContext): {
+    isRecent: boolean;
+    lastPaymentDate: string | null;
+    monthsAgo: number | null;
+  } {
+    const dividends = context.dividends;
+    if (!dividends || dividends.length === 0) {
+      return { isRecent: false, lastPaymentDate: null, monthsAgo: null };
+    }
+
+    let mostRecentDate: Date | null = null;
+    let mostRecentStr: string | null = null;
+
+    for (const d of dividends) {
+      const dateStr = d.payment_date ?? d.ex_dividend_date;
+      if (!dateStr) continue;
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime()) && (!mostRecentDate || date > mostRecentDate)) {
+        mostRecentDate = date;
+        mostRecentStr = dateStr;
+      }
+    }
+
+    if (!mostRecentDate || !mostRecentStr) {
+      return { isRecent: false, lastPaymentDate: null, monthsAgo: null };
+    }
+
+    const monthsAgo = (Date.now() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24 * 30.5);
+    return {
+      isRecent: monthsAgo <= 14, // 14-month buffer to handle annual payers
+      lastPaymentDate: mostRecentStr,
+      monthsAgo: Math.round(monthsAgo),
+    };
+  }
 
   /**
    * Calculate yield score (0-1)

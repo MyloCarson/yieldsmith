@@ -241,7 +241,7 @@ export class DataProviderNGXPulse implements IStockDataProvider {
     return data.map((row) => ({
       symbol,
       marketId: _marketId,
-      date: row.trade_date as DateOnly,
+      date: row.trade_date as unknown as DateOnly,
       open: row.open_price,
       high: row.high_price,
       low: row.low_price,
@@ -264,9 +264,9 @@ export class DataProviderNGXPulse implements IStockDataProvider {
       symbol,
       marketId,
       dividend_per_share: row.dividend_per_share,
-      ex_dividend_date: row.ex_dividend_date as DateOnly,
-      payment_date: (row.pay_date ?? row.ex_dividend_date) as DateOnly,
-      announcement_date: row.ex_dividend_date as DateOnly,
+      ex_dividend_date: row.ex_dividend_date as unknown as DateOnly,
+      payment_date: (row.pay_date ?? row.ex_dividend_date) as unknown as DateOnly,
+      announcement_date: row.ex_dividend_date as unknown as DateOnly,
       dividend_type: "regular",
     }));
 
@@ -280,8 +280,8 @@ export class DataProviderNGXPulse implements IStockDataProvider {
   }
 
   // NGX Pulse has no financials endpoint — return null so criteria handle missing data gracefully
-  async getFinancials(_symbol: StockSymbol, _marketId: MarketId): Promise<FinancialData | null> {
-    return null;
+  getFinancials(_symbol: StockSymbol, _marketId: MarketId): Promise<FinancialData | null> {
+    return Promise.resolve(null);
   }
 
   async searchStocks(query: string, limit?: number): Promise<StockSearchResult[]> {
@@ -303,6 +303,7 @@ export class DataProviderNGXPulse implements IStockDataProvider {
       marketId: "ngx" as MarketId,
       sector: s.sector ?? "Unknown",
       lastPrice: s.current_price,
+      peRatio: s.pe_ratio > 0 ? s.pe_ratio : undefined,
       timestamp: new Date(),
     }));
   }
