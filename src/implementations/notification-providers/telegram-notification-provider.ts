@@ -12,6 +12,7 @@ import {
 } from "@core/notification-provider";
 import { AlertPriority } from "@/types/alerts";
 import { NotificationError, InvalidRecipientError } from "@core/errors";
+import { escapeHtml } from "@/utils/html";
 import { BaseNotificationProvider } from "./base-notification-provider";
 
 export interface TelegramNotificationProviderConfig {
@@ -234,10 +235,6 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
 
 function validateMessageLength(text: string): void {
   if (text.length > TELEGRAM_MAX_MESSAGE_LENGTH) {
