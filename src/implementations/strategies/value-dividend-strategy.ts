@@ -13,7 +13,7 @@
  */
 
 import { EvaluationContext, StrategyEvaluation, StrategyType } from "@core/strategy";
-import { CriterionContext, CriterionEvaluation } from "@core/criterion";
+import { CriterionEvaluation } from "@core/criterion";
 import { StrategyError } from "@core/errors";
 import { BaseStrategy } from "./base-strategy";
 
@@ -35,16 +35,13 @@ export class ValueDividendStrategy extends BaseStrategy {
       throw new StrategyError(this.id, "Strategy not initialized. Call initialize() first.");
     }
 
-    const symbol = context.stockData?.symbol;
-    if (!symbol) {
-      throw new StrategyError(this.id, "Stock symbol required in context");
-    }
+    const symbol = context.symbol;
 
     // Evaluate against all criteria
-    const evaluations = [];
+    const evaluations: CriterionEvaluation[] = [];
     for (const { criterion } of this.criteria.values()) {
       try {
-        const evaluation = await criterion.evaluate(context as unknown as CriterionContext);
+        const evaluation = await criterion.evaluate(context);
         evaluations.push(evaluation);
       } catch (_error) {
         console.warn(`Criterion ${criterion.name} failed for ${symbol}`);
@@ -83,12 +80,14 @@ export class ValueDividendStrategy extends BaseStrategy {
     if (evaluations.length === 0) return "low";
 
     // Both valuation and dividend metrics must pass for high confidence
-    const valuationEval = evaluations.find((e) =>
+    const valuationCriteria = evaluations.filter((e) =>
       ["pe_ratio", "book_value"].includes(e.criterionName)
     );
+    const allValuationPass =
+      valuationCriteria.length > 0 && valuationCriteria.every((e) => e.passed);
     const dividendEval = evaluations.find((e) => e.criterionName === "dividend_yield");
 
-    if (!valuationEval?.passed || !dividendEval?.passed) return "low";
+    if (!allValuationPass || !dividendEval?.passed) return "low";
 
     const passedCount = evaluations.filter((e) => e.passed).length;
     const passRate = passedCount / evaluations.length;
@@ -112,6 +111,7 @@ export class ValueDividendStrategy extends BaseStrategy {
       ["debt_to_equity", "dividend_coverage", "earnings_growth"].includes(e.criterionName)
     );
 
+    if (fundamentalCriteria.length === 0) return "medium";
     const failedCount = fundamentalCriteria.filter((e) => !e.passed).length;
     if (failedCount >= fundamentalCriteria.length * 0.5) return "high";
     if (failedCount > 0) return "medium";

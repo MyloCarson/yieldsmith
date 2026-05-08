@@ -24,7 +24,7 @@ export class SectorConcentrationCriterion extends RiskCriterion {
 
   protected validateRequiredFields(context: CriterionContext): void {
     if (!context.stockData?.sector) {
-      throw new CriterionValidationError(this.name, ["sector"]);
+      throw new CriterionValidationError(this.name, ["stockData.sector"]);
     }
   }
 

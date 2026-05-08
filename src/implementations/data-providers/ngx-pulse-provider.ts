@@ -11,17 +11,85 @@
  */
 
 import { format, subDays, subMonths } from "date-fns";
-import { StockSymbol, MarketId } from "@/types/common";
+import { StockSymbol, MarketId, DateOnly } from "@/types/common";
 import { RateLimitError, ConfigurationError } from "@core/errors";
-import {
-  PriceSnapshot,
-  HistoricalPrice,
-  DividendData,
-  FinancialData,
-  StockSearchResult,
-  HealthCheckResult,
-  ProviderCapabilities,
-} from "./mock-data-provider";
+
+// Local type definitions for provider data contracts
+export interface PriceSnapshot {
+  symbol: StockSymbol;
+  marketId: MarketId;
+  currentPrice: number;
+  previousClose: number;
+  change: number;
+  changePercent: number;
+  timestamp: Date;
+  source: string;
+}
+
+export interface HistoricalPrice {
+  symbol: StockSymbol;
+  marketId: MarketId;
+  date: DateOnly;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  adjustedClose: number;
+}
+
+export interface DividendData {
+  symbol: StockSymbol;
+  marketId: MarketId;
+  dividend_per_share: number;
+  ex_dividend_date: DateOnly;
+  payment_date: DateOnly;
+  announcement_date: DateOnly;
+  dividend_type: string;
+}
+
+export interface FinancialData {
+  symbol: StockSymbol;
+  marketId: MarketId;
+  period: string;
+  date: DateOnly;
+  revenue: number;
+  net_income: number;
+  eps: number;
+  book_value: number;
+  debt: number;
+  equity: number;
+  cash_flow: number;
+}
+
+export interface StockSearchResult {
+  symbol: StockSymbol;
+  name: string;
+  marketId: MarketId;
+  sector: string;
+  lastPrice: number;
+  timestamp: Date;
+}
+
+export interface HealthCheckResult {
+  healthy: boolean;
+  status: string;
+  lastCheck: Date;
+  responseTime: number;
+  error?: string;
+}
+
+export interface ProviderCapabilities {
+  supportsHistoricalData: boolean;
+  supportsDividendData: boolean;
+  supportsFinancialData: boolean;
+  supportsNewsData: boolean;
+  supportsEarningsData: boolean;
+  maxHistoricalDays: number;
+  maxSearchResults: number;
+  rateLimitType: string;
+  cacheSupported: boolean;
+}
 
 /**
  * NGX Pulse provider configuration
@@ -180,9 +248,7 @@ export class DataProviderNGXPulse {
    * Check if provider is configured
    */
   isConfigured(): boolean {
-    // For now, basic configuration check
-    // In production, would validate API key existence
-    return this.config.baseUrl.length > 0;
+    return this.config.baseUrl.length > 0 && this.config.apiKey.length > 0;
   }
 
   /**
@@ -294,16 +360,16 @@ export class DataProviderNGXPulse {
   async getDividendHistory(symbol: StockSymbol, marketId: MarketId): Promise<DividendData[]> {
     await this.rateLimiter.checkLimit();
 
-    // Generate mock dividend history (last 4 quarters)
+    // Generate mock dividend history (last 4 quarters), oldest-first
     const history: DividendData[] = [];
 
-    for (let i = 0; i < 4; i++) {
+    for (let i = 3; i >= 0; i--) {
       const baseDate = subMonths(new Date(), i * 3);
 
       const dividend: DividendData = {
         symbol,
         marketId,
-        dividend_per_share: (Math.random() * 50 + 20) * (1 - i * 0.05), // Slightly declining
+        dividend_per_share: (Math.random() * 50 + 20) * (1 + (3 - i) * 0.05), // Slightly growing
         ex_dividend_date: this.formatDate(subDays(baseDate, 10)),
         payment_date: this.formatDate(baseDate),
         announcement_date: this.formatDate(subDays(baseDate, 30)),
@@ -365,7 +431,7 @@ export class DataProviderNGXPulse {
     await this.rateLimiter.checkLimit();
 
     // Mock search results
-    const mockSymbols = ["MTNN", "DANGOTE", "BUA", "ETI", "AIRTEL", "NESTLE"];
+    const mockSymbols = ["MTNN", "BUA", "ETI", "UBA", "GTCO", "FBNH"];
     const results: StockSearchResult[] = mockSymbols
       .filter((s) => s.includes(query.toUpperCase()) || query === "")
       .slice(0, limit ?? 10)

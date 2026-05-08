@@ -235,7 +235,7 @@ export class DataProviderMock {
 
     const history = this.store.getDividendHistory(symbol, marketId);
     if (history && history.length > 0) {
-      return Promise.resolve(history[0] ?? null);
+      return Promise.resolve(history[history.length - 1] ?? null);
     }
 
     // Generate mock dividend
@@ -262,17 +262,8 @@ export class DataProviderMock {
       return Promise.resolve(stored);
     }
 
-    // Generate mock history
+    // Generate mock history (oldest-first)
     const history: DividendData[] = [
-      {
-        symbol,
-        marketId,
-        dividend_per_share: 50,
-        ex_dividend_date: "2025-12-01",
-        payment_date: "2026-01-15",
-        announcement_date: "2025-11-01",
-        dividend_type: "regular",
-      },
       {
         symbol,
         marketId,
@@ -280,6 +271,15 @@ export class DataProviderMock {
         ex_dividend_date: "2025-09-01",
         payment_date: "2025-10-15",
         announcement_date: "2025-08-01",
+        dividend_type: "regular",
+      },
+      {
+        symbol,
+        marketId,
+        dividend_per_share: 50,
+        ex_dividend_date: "2025-12-01",
+        payment_date: "2026-01-15",
+        announcement_date: "2025-11-01",
         dividend_type: "regular",
       },
     ];
@@ -319,7 +319,7 @@ export class DataProviderMock {
   searchStocks(query: string, limit?: number): Promise<StockSearchResult[]> {
     this.callCount++;
 
-    const mockSymbols = ["MTNN", "DANGOTE", "BUA", "ETI", "AIRTEL", "NESTLE"];
+    const mockSymbols = ["MTNN", "BUA", "ETI", "UBA", "GTCO", "FBNH"];
     const results = mockSymbols
       .filter((s) => s.includes(query.toUpperCase()) || query === "")
       .slice(0, limit ?? 10)
@@ -464,7 +464,7 @@ export class DataProviderMock {
    */
   private setupDefaultData(): void {
     // Add some default mock stocks
-    const defaultSymbols: StockSymbol[] = ["MTNN", "DANGOTE", "BUA"] as StockSymbol[];
+    const defaultSymbols: StockSymbol[] = ["MTNN", "GTCO", "BUA"] as StockSymbol[];
 
     for (const symbol of defaultSymbols) {
       this.store.setPriceSnapshot(
@@ -473,6 +473,15 @@ export class DataProviderMock {
         this.createMockPrice(symbol, "ngx" as MarketId)
       );
       this.store.setDividendHistory(symbol, "ngx" as MarketId, [
+        {
+          symbol,
+          marketId: "ngx" as MarketId,
+          dividend_per_share: 45,
+          ex_dividend_date: "2025-09-01",
+          payment_date: "2025-10-15",
+          announcement_date: "2025-08-01",
+          dividend_type: "regular",
+        },
         {
           symbol,
           marketId: "ngx" as MarketId,

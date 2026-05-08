@@ -103,7 +103,14 @@ export class PayoutRatioCriterion extends DividendCriterion {
     const thresholds = this.getThresholds(context);
 
     return Promise.resolve(
-      this.createEvaluation(context, isAcceptable, score, payoutRatio, explanation, thresholds)
+      this.createEvaluation(
+        context,
+        isAcceptable,
+        score,
+        payoutRatio * 100,
+        explanation,
+        thresholds
+      )
     );
   }
 
@@ -114,9 +121,9 @@ export class PayoutRatioCriterion extends DividendCriterion {
     return {
       name: this.name,
       description: "Dividend payout ratio (Dividends / Net Income)",
-      min: this.config.minPayoutRatio,
-      max: this.config.maxPayoutRatio,
-      target: this.config.targetPayoutRatio,
+      min: this.config.minPayoutRatio * 100,
+      max: this.config.maxPayoutRatio * 100,
+      target: this.config.targetPayoutRatio * 100,
       unit: "%",
     };
   }

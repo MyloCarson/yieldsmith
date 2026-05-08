@@ -25,10 +25,10 @@ import { QualityScoreCriterion } from "./quality-score-criterion";
 import { SectorConcentrationCriterion } from "./sector-concentration-criterion";
 
 /**
- * Criterion constructor or lazy loader
+ * Criterion constructor type
  */
 type CriterionConstructor = new () => ICriterion;
-type CriterionProvider = CriterionConstructor | (() => CriterionConstructor);
+type CriterionProvider = CriterionConstructor;
 
 /**
  * Criterion factory
@@ -64,24 +64,22 @@ export class CriterionFactory implements ICriterionFactory {
       }
 
       const promise = (async (): Promise<ICriterion> => {
-        // Resolve constructor: if provider is a function, call it; otherwise use directly
-        const ctor =
-          typeof constructor === "function" && constructor.prototype === undefined
-            ? (constructor as () => CriterionConstructor)()
-            : (constructor as CriterionConstructor);
-
-        const instance = new ctor();
+        const instance = new constructor();
         await instance.initialize();
         this.instances.set(criterionName, instance);
         return instance;
-      })().catch((error: unknown) => {
-        this.initPromises.delete(criterionName);
-        throw new ProviderFactoryError(
-          "Criterion",
-          criterionName,
-          error instanceof Error ? error : new Error(String(error))
-        );
-      });
+      })()
+        .catch((error: unknown) => {
+          this.initPromises.delete(criterionName);
+          throw new ProviderFactoryError(
+            "Criterion",
+            criterionName,
+            error instanceof Error ? error : new Error(String(error))
+          );
+        })
+        .finally(() => {
+          this.initPromises.delete(criterionName);
+        });
 
       this.initPromises.set(criterionName, promise);
     }
@@ -125,13 +123,7 @@ export class CriterionFactory implements ICriterionFactory {
 
     for (const [name, provider] of this.registry.entries()) {
       try {
-        // Resolve constructor: if provider is a function, call it; otherwise use directly
-        const ctor =
-          typeof provider === "function" && provider.prototype === undefined
-            ? (provider as () => CriterionConstructor)()
-            : (provider as CriterionConstructor);
-
-        const instance = new ctor();
+        const instance = new provider();
         await instance.initialize();
         this.instances.set(name, instance);
       } catch (error) {

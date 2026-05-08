@@ -21,15 +21,10 @@ import { ValueDividendStrategy } from "./value-dividend-strategy";
 type StrategyConstructor = new () => IStrategy;
 
 /**
- * Strategy constructor or lazy loader
- */
-type StrategyProvider = StrategyConstructor | (() => StrategyConstructor);
-
-/**
  * Strategy factory implementation
  */
 export class StrategyFactory {
-  private registry: Map<string, StrategyProvider> = new Map();
+  private registry: Map<string, StrategyConstructor> = new Map();
   private instances: Map<string, IStrategy> = new Map();
   private initPromises: Map<string, Promise<IStrategy>> = new Map();
 
@@ -66,26 +61,18 @@ export class StrategyFactory {
 
     // Create and initialize instance
     const promise = (async (): Promise<IStrategy> => {
-      // Resolve provider: if it's a function with no prototype, call it; otherwise use directly
-      const ctor =
-        typeof provider === "function" && provider.prototype === undefined
-          ? (provider as () => StrategyConstructor)()
-          : (provider as StrategyConstructor);
-
-      const instance = new ctor();
-
-      try {
-        await instance.initialize();
-        this.instances.set(key, instance);
-        return instance;
-      } catch (error) {
+      const instance = new provider();
+      await instance.initialize();
+      this.instances.set(key, instance);
+      return instance;
+    })()
+      .catch((error: unknown) => {
         this.initPromises.delete(key);
         throw error instanceof Error ? error : new Error(String(error));
-      }
-    })().catch((error: unknown) => {
-      this.initPromises.delete(key);
-      throw error;
-    });
+      })
+      .finally(() => {
+        this.initPromises.delete(key);
+      });
 
     this.initPromises.set(key, promise);
     return promise;
@@ -101,7 +88,7 @@ export class StrategyFactory {
   /**
    * Register a custom strategy
    */
-  registerStrategy(type: StrategyType, provider: StrategyProvider): void {
+  registerStrategy(type: StrategyType, provider: StrategyConstructor): void {
     this.registry.set(String(type), provider);
   }
 
@@ -123,18 +110,9 @@ export class StrategyFactory {
    * Register default strategies
    */
   private registerDefaults(): void {
-    this.registerStrategy(
-      "dividend_growth",
-      DividendGrowthStrategy as unknown as StrategyConstructor
-    );
-    this.registerStrategy(
-      "steady_dividend",
-      SteadyDividendStrategy as unknown as StrategyConstructor
-    );
-    this.registerStrategy(
-      "value_dividend",
-      ValueDividendStrategy as unknown as StrategyConstructor
-    );
+    this.registerStrategy("dividend_growth", DividendGrowthStrategy);
+    this.registerStrategy("steady_dividend", SteadyDividendStrategy);
+    this.registerStrategy("value_dividend", ValueDividendStrategy);
   }
 }
 

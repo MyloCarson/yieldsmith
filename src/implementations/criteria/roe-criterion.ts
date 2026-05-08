@@ -98,7 +98,7 @@ export class ROECriterion extends GrowthCriterion {
     const thresholds = this.getThresholds(context);
 
     return Promise.resolve(
-      this.createEvaluation(context, isAcceptable, score, roe, explanation, thresholds)
+      this.createEvaluation(context, isAcceptable, score, roe * 100, explanation, thresholds)
     );
   }
 
@@ -109,9 +109,9 @@ export class ROECriterion extends GrowthCriterion {
     return {
       name: this.name,
       description: "Return on Equity (Net Income / Equity)",
-      min: this.config.minROE,
-      max: this.config.maxROE,
-      target: this.config.targetROE,
+      min: this.config.minROE * 100,
+      max: this.config.maxROE * 100,
+      target: this.config.targetROE * 100,
       unit: "%",
     };
   }

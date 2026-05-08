@@ -66,7 +66,7 @@ export class QualityScoreCriterion extends GrowthCriterion {
         context,
         isAcceptable,
         score,
-        qualityScore,
+        qualityScore * 100,
         explanation,
         this.getThresholds()
       )
@@ -77,9 +77,9 @@ export class QualityScoreCriterion extends GrowthCriterion {
     return {
       name: this.name,
       description: "Quality Score (0-100)",
-      min: this.minQualityScore,
-      max: 1,
-      target: this.targetQualityScore,
+      min: this.minQualityScore * 100,
+      max: 100,
+      target: this.targetQualityScore * 100,
       unit: "%",
     };
   }

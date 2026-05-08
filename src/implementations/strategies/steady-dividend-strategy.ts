@@ -13,7 +13,7 @@
  */
 
 import { EvaluationContext, StrategyEvaluation, StrategyType } from "@core/strategy";
-import { CriterionContext, CriterionEvaluation } from "@core/criterion";
+import { CriterionEvaluation } from "@core/criterion";
 import { StrategyError } from "@core/errors";
 import { BaseStrategy } from "./base-strategy";
 
@@ -35,16 +35,13 @@ export class SteadyDividendStrategy extends BaseStrategy {
       throw new StrategyError(this.id, "Strategy not initialized. Call initialize() first.");
     }
 
-    const symbol = context.stockData?.symbol;
-    if (!symbol) {
-      throw new StrategyError(this.id, "Stock symbol required in context");
-    }
+    const symbol = context.symbol;
 
     // Evaluate against all criteria
-    const evaluations = [];
+    const evaluations: CriterionEvaluation[] = [];
     for (const { criterion } of this.criteria.values()) {
       try {
-        const evaluation = await criterion.evaluate(context as unknown as CriterionContext);
+        const evaluation = await criterion.evaluate(context);
         evaluations.push(evaluation);
       } catch (_error) {
         console.warn(`Criterion ${criterion.name} failed for ${symbol}`);

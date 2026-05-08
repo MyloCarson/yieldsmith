@@ -62,7 +62,7 @@ export class VolatilityCriterion extends RiskCriterion {
         context,
         isAcceptable,
         score,
-        volatility,
+        volatility * 100,
         explanation,
         this.getThresholds()
       )
@@ -73,9 +73,9 @@ export class VolatilityCriterion extends RiskCriterion {
     return {
       name: this.name,
       description: "Annualized volatility (%)",
-      min: this.config.minVolatility,
-      max: this.config.maxVolatility,
-      target: this.config.targetVolatility,
+      min: this.config.minVolatility * 100,
+      max: this.config.maxVolatility * 100,
+      target: this.config.targetVolatility * 100,
       unit: "%",
     };
   }
