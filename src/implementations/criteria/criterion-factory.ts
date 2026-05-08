@@ -11,17 +11,30 @@
 import { ICriterion, ICriterionFactory } from "@core/criterion";
 import { ProviderFactoryError, ConfigurationError } from "@core/errors";
 import { DividendYieldCriterion } from "./dividend-yield-criterion";
+import { DividendCoverageCriterion } from "./dividend-coverage-criterion";
+import { DividendGrowthCriterion } from "./dividend-growth-criterion";
+import { PayoutRatioCriterion } from "./payout-ratio-criterion";
+import { PERatioCriterion } from "./pe-ratio-criterion";
+import { BookValueCriterion } from "./book-value-criterion";
+import { DebtToEquityCriterion } from "./debt-to-equity-criterion";
+import { VolatilityCriterion } from "./volatility-criterion";
+import { LiquidityCriterion } from "./liquidity-criterion";
+import { EarningsGrowthCriterion } from "./earnings-growth-criterion";
+import { ROECriterion } from "./roe-criterion";
+import { QualityScoreCriterion } from "./quality-score-criterion";
+import { SectorConcentrationCriterion } from "./sector-concentration-criterion";
 
 /**
- * Registry of available criterion implementations
+ * Criterion constructor or lazy loader
  */
 type CriterionConstructor = new () => ICriterion;
+type CriterionProvider = CriterionConstructor | (() => CriterionConstructor);
 
 /**
  * Criterion factory
  */
 export class CriterionFactory implements ICriterionFactory {
-  private registry: Map<string, CriterionConstructor> = new Map();
+  private registry: Map<string, CriterionProvider> = new Map();
   private instances: Map<string, ICriterion> = new Map();
   private initPromises: Map<string, Promise<ICriterion>> = new Map();
   private initialized = false;
@@ -51,7 +64,13 @@ export class CriterionFactory implements ICriterionFactory {
       }
 
       const promise = (async (): Promise<ICriterion> => {
-        const instance = new constructor();
+        // Resolve constructor: if provider is a function, call it; otherwise use directly
+        const ctor =
+          typeof constructor === "function" && constructor.prototype === undefined
+            ? (constructor as () => CriterionConstructor)()
+            : (constructor as CriterionConstructor);
+
+        const instance = new ctor();
         await instance.initialize();
         this.instances.set(criterionName, instance);
         return instance;
@@ -78,10 +97,10 @@ export class CriterionFactory implements ICriterionFactory {
   }
 
   /**
-   * Register a criterion implementation
+   * Register a criterion implementation (direct constructor or lazy loader)
    */
-  registerCriterion(name: string, constructor: CriterionConstructor): void {
-    this.registry.set(name, constructor);
+  registerCriterion(name: string, provider: CriterionProvider): void {
+    this.registry.set(name, provider);
   }
 
   /**
@@ -104,9 +123,15 @@ export class CriterionFactory implements ICriterionFactory {
   async initializeAll(): Promise<void> {
     if (this.initialized) return;
 
-    for (const [name, constructor] of this.registry.entries()) {
+    for (const [name, provider] of this.registry.entries()) {
       try {
-        const instance = new constructor();
+        // Resolve constructor: if provider is a function, call it; otherwise use directly
+        const ctor =
+          typeof provider === "function" && provider.prototype === undefined
+            ? (provider as () => CriterionConstructor)()
+            : (provider as CriterionConstructor);
+
+        const instance = new ctor();
         await instance.initialize();
         this.instances.set(name, instance);
       } catch (error) {
@@ -142,7 +167,30 @@ export class CriterionFactory implements ICriterionFactory {
    * Register default criterion implementations
    */
   private registerDefaults(): void {
+    // Dividend criteria
     this.registerCriterion("dividend_yield", DividendYieldCriterion);
+    this.registerCriterion("dividend_coverage", DividendCoverageCriterion);
+    this.registerCriterion("dividend_growth", DividendGrowthCriterion);
+    this.registerCriterion("payout_ratio", PayoutRatioCriterion);
+
+    // Valuation criteria
+    this.registerCriterion("pe_ratio", PERatioCriterion);
+    this.registerCriterion("book_value", BookValueCriterion);
+
+    // Financial health/Risk criteria
+    this.registerCriterion("debt_to_equity", DebtToEquityCriterion);
+    this.registerCriterion("volatility", VolatilityCriterion);
+    this.registerCriterion("liquidity", LiquidityCriterion);
+
+    // Growth criteria
+    this.registerCriterion("earnings_growth", EarningsGrowthCriterion);
+    this.registerCriterion("roe", ROECriterion);
+
+    // Quality criteria
+    this.registerCriterion("quality_score", QualityScoreCriterion);
+
+    // Portfolio criteria
+    this.registerCriterion("sector_concentration", SectorConcentrationCriterion);
   }
 }
 
