@@ -27,6 +27,8 @@ import {
   TimeoutError,
 } from "@core/errors";
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 /**
  * NGX market configuration
  */
@@ -58,7 +60,7 @@ export class MarketNGX implements IMarket {
   readonly name = "Nigerian Exchange Group";
   readonly country = "Nigeria";
   readonly currency = "NGN";
-  readonly timezone = "Africa/Lagos";
+  readonly timezone: string;
 
   private config: MarketNGXConfig;
   private cachedHealthResult: HealthCheckResult | null = null;
@@ -90,6 +92,9 @@ export class MarketNGX implements IMarket {
   // Valid NGX symbols: 3-4 uppercase letters (e.g., MTNN, BUA, ETI)
   private readonly VALID_SYMBOL_PATTERN = /^[A-Z]{3,4}$/;
 
+  // Common NGX symbols for similarity suggestions (all match 3-4 char pattern)
+  private readonly COMMON_SYMBOLS = ["MTNN", "BUA", "ETI", "UBA", "GTCO", "FBNH"];
+
   constructor(config: Partial<MarketNGXConfig> = {}) {
     this.config = {
       timezone: "Africa/Lagos",
@@ -101,6 +106,7 @@ export class MarketNGX implements IMarket {
       withholdingTaxRate: 0.1,
       ...config,
     };
+    this.timezone = this.config.timezone;
   }
 
   isConfigured(): boolean {
@@ -114,7 +120,7 @@ export class MarketNGX implements IMarket {
     if (this.HOLIDAYS_2026.has(dateStr)) return false;
 
     const timeInMinutes = hour * 60 + minute;
-    const { openTime, closeTime } = this.getSessionHours(dateStr, isoDay);
+    const { openTime, closeTime } = this.getSessionHours(dateStr);
     const openMinutes = openTime.hour * 60 + openTime.minute;
     const closeMinutes = closeTime.hour * 60 + closeTime.minute;
 
@@ -132,7 +138,7 @@ export class MarketNGX implements IMarket {
       return { openTime: { hour: 0, minute: 0 }, closeTime: { hour: 0, minute: 0 }, daysOpen: [] };
     }
 
-    const { openTime, closeTime } = this.getSessionHours(dateStr, isoDay);
+    const { openTime, closeTime } = this.getSessionHours(dateStr);
     return { openTime, closeTime, daysOpen: [isoDay] };
   }
 
@@ -155,26 +161,24 @@ export class MarketNGX implements IMarket {
   }
 
   getNextTradingDay(fromDate: Date): Date {
-    const date = new Date(fromDate);
-    date.setDate(date.getDate() + 1);
-    date.setHours(0, 0, 0, 0);
+    // Add days in fixed 24h increments — safe for WAT (no DST)
+    let candidate = new Date(fromDate.getTime() + MS_PER_DAY);
 
     for (let i = 0; i < 7; i++) {
-      if (this.getTradingHours(date).daysOpen.length > 0) return date;
-      date.setDate(date.getDate() + 1);
+      if (this.getTradingHours(candidate).daysOpen.length > 0) return candidate;
+      candidate = new Date(candidate.getTime() + MS_PER_DAY);
     }
 
     throw new MarketClosedError("No trading day found in the next 7 days");
   }
 
   getPreviousTradingDay(fromDate: Date): Date {
-    const date = new Date(fromDate);
-    date.setDate(date.getDate() - 1);
-    date.setHours(0, 0, 0, 0);
+    // Subtract days in fixed 24h increments — safe for WAT (no DST)
+    let candidate = new Date(fromDate.getTime() - MS_PER_DAY);
 
     for (let i = 0; i < 7; i++) {
-      if (this.getTradingHours(date).daysOpen.length > 0) return date;
-      date.setDate(date.getDate() - 1);
+      if (this.getTradingHours(candidate).daysOpen.length > 0) return candidate;
+      candidate = new Date(candidate.getTime() - MS_PER_DAY);
     }
 
     throw new MarketClosedError("No trading day found in the previous 7 days");
@@ -185,7 +189,13 @@ export class MarketNGX implements IMarket {
     return this.HOLIDAYS_2026.has(dateStr);
   }
 
-  getHolidays(_year: number): Date[] {
+  getHolidays(year: number): Date[] {
+    if (year !== 2026) {
+      throw new ConfigurationError(
+        "MarketNGX",
+        `Holiday calendar only available for 2026; requested ${year}`
+      );
+    }
     return Array.from(this.HOLIDAYS_2026).map((s) => new Date(s));
   }
 
@@ -317,10 +327,10 @@ export class MarketNGX implements IMarket {
   /**
    * Resolve open/close times for a specific date, accounting for half-days.
    */
-  private getSessionHours(
-    dateStr: string,
-    _isoDay: number
-  ): { openTime: { hour: number; minute: number }; closeTime: { hour: number; minute: number } } {
+  private getSessionHours(dateStr: string): {
+    openTime: { hour: number; minute: number };
+    closeTime: { hour: number; minute: number };
+  } {
     if (this.HALF_DAYS_2026.has(dateStr)) {
       return { openTime: { hour: 10, minute: 0 }, closeTime: { hour: 12, minute: 0 } };
     }
@@ -328,10 +338,10 @@ export class MarketNGX implements IMarket {
   }
 
   private getSimilarSymbols(input: string): StockSymbol[] {
-    const common = ["MTNN", "DANGOTE", "BUA", "ETI", "AIRTEL", "NESTLE"];
-    return common
-      .filter((s) => this.calculateSimilarity(input, s) > 0.5)
-      .slice(0, 3) as StockSymbol[];
+    return this.COMMON_SYMBOLS.filter((s) => this.calculateSimilarity(input, s) > 0.5).slice(
+      0,
+      3
+    ) as StockSymbol[];
   }
 
   private calculateSimilarity(a: string, b: string): number {
@@ -377,28 +387,33 @@ export class MarketNGX implements IMarket {
 }
 
 /**
- * MarketNGX factory — singleton pattern
+ * MarketNGX factory — singleton with concurrency-safe initialization
  */
 export class MarketNGXFactory implements IMarketFactory {
   private instance: MarketNGX | null = null;
+  private initPromise: Promise<IMarket> | null = null;
   private config: Partial<MarketNGXConfig>;
 
   constructor(config: Partial<MarketNGXConfig> = {}) {
     this.config = config;
   }
 
-  async createProvider(marketId: string): Promise<IMarket> {
+  createProvider(marketId: string): Promise<IMarket> {
     if (marketId !== "ngx") {
       throw new ConfigurationError(
         "MarketNGXFactory",
         `Only supports 'ngx' market, got '${marketId}'`
       );
     }
-    if (!this.instance) {
-      this.instance = new MarketNGX(this.config);
-      await this.instance.initialize();
+    if (!this.initPromise) {
+      this.initPromise = (async (): Promise<IMarket> => {
+        const market = new MarketNGX(this.config);
+        await market.initialize();
+        this.instance = market;
+        return market;
+      })();
     }
-    return this.instance;
+    return this.initPromise;
   }
 
   getDefaultProvider(): Promise<IMarket> {

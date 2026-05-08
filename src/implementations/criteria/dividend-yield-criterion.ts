@@ -10,6 +10,7 @@
 
 import { CriterionContext, CriterionEvaluation, CriterionThresholds } from "@core/criterion";
 import { Score } from "@/types/common";
+import { CriterionValidationError } from "@core/errors";
 import { DividendCriterion } from "./base-criterion";
 
 /**
@@ -20,7 +21,7 @@ export interface DividendYieldConfig {
   targetYield: number; // Target yield for portfolio goal (%)
   maxYield: number; // Maximum yield (potential red flag)
   preferredPayoutFrequency?: "monthly" | "quarterly" | "annual"; // NGX stocks are mostly quarterly
-  withholding_tax_rate?: number; // 10% for NGX
+  withholdingTaxRate?: number; // 10% for NGX
 }
 
 /**
@@ -45,7 +46,7 @@ export class DividendYieldCriterion extends DividendCriterion {
     targetYield: 5.0, // 5% target (portfolio-wide)
     maxYield: 20.0, // >20% is suspicious (potential capital loss risk)
     preferredPayoutFrequency: "quarterly",
-    withholding_tax_rate: 0.1, // 10% NGX standard
+    withholdingTaxRate: 0.1, // 10% NGX standard
   };
 
   /**
@@ -61,17 +62,15 @@ export class DividendYieldCriterion extends DividendCriterion {
   protected validateRequiredFields(context: CriterionContext): void {
     const missingFields: string[] = [];
 
-    if (!context.stockData?.dividendYield) {
+    if (context.stockData?.dividendYield == null) {
       missingFields.push("stockData.dividendYield");
     }
-    if (!context.stockData?.price) {
+    if (context.stockData?.price == null) {
       missingFields.push("stockData.price");
     }
-    // Dividend history is preferred but not strictly required
-    // (current yield alone can be evaluated)
 
     if (missingFields.length > 0) {
-      throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
+      throw new CriterionValidationError(this.name, missingFields);
     }
   }
 
@@ -84,7 +83,7 @@ export class DividendYieldCriterion extends DividendCriterion {
     const stockData = context.stockData!;
     const grossYield = (stockData.dividendYield || 0) * 100;
 
-    const withholdingTax = this.config.withholding_tax_rate ?? 0.1;
+    const withholdingTax = this.config.withholdingTaxRate ?? 0.1;
     const netYield = grossYield * (1 - withholdingTax);
 
     const thresholds = this.getThresholds(context);
@@ -134,12 +133,11 @@ export class DividendYieldCriterion extends DividendCriterion {
   getLogicExplanation(): string {
     return `
 Stock must have:
-1. Gross dividend yield > ${this.config.minYield}%
-2. After 10% NGX withholding tax: net yield > ${this.config.minYield}%
-3. Not exceeding ${this.config.maxYield}% (red flag for sustainability)
-4. Preferably: trending upward or stable (not declining)
+1. Tax-adjusted (net) dividend yield >= ${this.config.minYield}% (after ${((this.config.withholdingTaxRate ?? 0.1) * 100).toFixed(0)}% NGX withholding tax)
+2. Net yield not exceeding ${this.config.maxYield}% (red flag for sustainability)
+3. Preferably: trending upward or stable (not declining)
 
-Higher scores for yields above target (${this.config.targetYield}%),
+Higher scores for net yields above target (${this.config.targetYield}%),
 adjusted for market conditions.
     `.trim();
   }
@@ -212,7 +210,7 @@ adjusted for market conditions.
 
     // Determine trend
     let trend: "increasing" | "stable" | "decreasing" | "unknown" = "unknown";
-    if (latestDiv && previousDiv) {
+    if (latestDiv && previousDiv && previousDiv.dividend_per_share > 0) {
       const change =
         (latestDiv.dividend_per_share - previousDiv.dividend_per_share) /
         previousDiv.dividend_per_share;

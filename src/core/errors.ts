@@ -167,7 +167,7 @@ export class RateLimitError extends DataProviderError {
   constructor(resetAtMs: number, context?: Record<string, unknown>) {
     super("RATE_LIMITED", "API rate limit exceeded", {
       retryable: true,
-      retryAfterMs: resetAtMs,
+      retryAfterMs: Math.max(0, resetAtMs - Date.now()),
       context,
     });
     this.name = "RateLimitError";

@@ -50,7 +50,7 @@
     ],
     "no-empty-function": "off",
     "@typescript-eslint/no-empty-function": "off",
-    "eqeqeq": ["error", "always"],
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
     "prefer-const": "error",
     "no-var": "error"
   },

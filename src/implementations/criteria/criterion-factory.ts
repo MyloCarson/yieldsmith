@@ -23,6 +23,7 @@ type CriterionConstructor = new () => ICriterion;
 export class CriterionFactory implements ICriterionFactory {
   private registry: Map<string, CriterionConstructor> = new Map();
   private instances: Map<string, ICriterion> = new Map();
+  private initPromises: Map<string, Promise<ICriterion>> = new Map();
   private initialized = false;
 
   constructor() {
@@ -32,34 +33,41 @@ export class CriterionFactory implements ICriterionFactory {
   /**
    * Create a criterion by name
    */
-  async createCriterion(criterionName: string): Promise<ICriterion> {
-    try {
-      // Return cached instance if available
-      if (this.instances.has(criterionName)) {
-        return this.instances.get(criterionName)!;
-      }
+  createCriterion(criterionName: string): Promise<ICriterion> {
+    if (this.instances.has(criterionName)) {
+      return Promise.resolve(this.instances.get(criterionName)!);
+    }
 
-      // Get constructor from registry
+    if (!this.initPromises.has(criterionName)) {
       const constructor = this.registry.get(criterionName);
       if (!constructor) {
-        throw new Error(`Criterion "${criterionName}" not registered`);
+        return Promise.reject(
+          new ProviderFactoryError(
+            "Criterion",
+            criterionName,
+            new Error(`Criterion "${criterionName}" not registered`)
+          )
+        );
       }
 
-      // Create and initialize instance
-      const instance = new constructor();
-      await instance.initialize();
+      const promise = (async (): Promise<ICriterion> => {
+        const instance = new constructor();
+        await instance.initialize();
+        this.instances.set(criterionName, instance);
+        return instance;
+      })().catch((error: unknown) => {
+        this.initPromises.delete(criterionName);
+        throw new ProviderFactoryError(
+          "Criterion",
+          criterionName,
+          error instanceof Error ? error : new Error(String(error))
+        );
+      });
 
-      // Cache instance
-      this.instances.set(criterionName, instance);
-
-      return instance;
-    } catch (error) {
-      throw new ProviderFactoryError(
-        "Criterion",
-        criterionName,
-        error instanceof Error ? error : new Error(String(error))
-      );
+      this.initPromises.set(criterionName, promise);
     }
+
+    return this.initPromises.get(criterionName)!;
   }
 
   /**
@@ -104,7 +112,7 @@ export class CriterionFactory implements ICriterionFactory {
       } catch (error) {
         throw new ConfigurationError(
           "CriterionFactory",
-          `Failed to initialize criterion "${name}"`
+          `Failed to initialize criterion "${name}": ${error instanceof Error ? error.message : String(error)}`
         );
       }
     }
