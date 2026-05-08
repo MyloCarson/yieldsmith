@@ -6,15 +6,15 @@ export async function handleHelp(ctx: BotContext): Promise<void> {
       `<b>Available now</b>\n` +
       `/start — Welcome and introduction\n` +
       `/help — This message\n` +
-      `/health — System status\n\n` +
+      `/health — System status\n` +
+      `/stock_health &lt;SYMBOL&gt; — Full stock analysis against all criteria\n` +
+      `/explore — Discover top NGX dividend stocks\n\n` +
       `<b>Coming soon — Portfolio</b>\n` +
       `/portfolio — View your current holdings\n` +
       `/add_holding — Add a stock to your portfolio\n` +
       `/remove_holding — Remove a stock from your portfolio\n` +
       `/performance — Portfolio returns and metrics\n\n` +
       `<b>Coming soon — Analysis</b>\n` +
-      `/stock_health &lt;SYMBOL&gt; — Full stock analysis\n` +
-      `/explore — Discover dividend stocks\n` +
       `/recommend — AI-powered recommendations\n\n` +
       `<b>Coming soon — Dividends</b>\n` +
       `/dividend_calendar — Upcoming dividend payments\n` +

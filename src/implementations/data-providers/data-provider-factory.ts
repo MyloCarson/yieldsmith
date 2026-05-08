@@ -10,28 +10,16 @@
  */
 
 import { ProviderFactoryError, ConfigurationError } from "@core/errors";
+import { IStockDataProvider } from "@core/data-provider";
 import { DataProviderNGXPulse } from "./ngx-pulse-provider";
 import { DataProviderMock } from "./mock-data-provider";
 
-/**
- * Data provider type
- */
 export type DataProviderType = "ngx_pulse" | "alpha_vantage" | "finnhub" | "polygon" | "mock";
 
-/**
- * Minimal interface for a data provider (used by this factory)
- */
-export interface IDataProvider {
-  readonly id: string;
-  readonly name: string;
-  isConfigured(): boolean;
-  initialize(): Promise<void>;
-  healthCheck(): Promise<{ healthy: boolean; status: string }>;
-}
+export type { IStockDataProvider };
 
-/**
- * Provider constructor
- */
+type IDataProvider = IStockDataProvider;
+
 type DataProviderConstructor = new (config?: Record<string, unknown>) => IDataProvider;
 
 /**
@@ -117,6 +105,10 @@ export class DataProviderFactory {
       this.primaryProvider = await this.createProvider(this.config.primaryProvider);
     }
     return this.primaryProvider;
+  }
+
+  getStockProvider(): Promise<IStockDataProvider> {
+    return this.getPrimaryProvider();
   }
 
   /**

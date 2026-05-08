@@ -1,8 +1,10 @@
 import { TelegramBot } from "./bot/telegram-bot";
 import { parseAllowedUserIds } from "./bot/middleware/auth.middleware";
+import { StockService } from "./bot/services/stock-service";
 import { getAIProviderFactory } from "./implementations/ai-providers/ai-provider-factory";
 import { getDataProviderFactory } from "./implementations/data-providers/data-provider-factory";
 import { getNotificationProviderFactory } from "./implementations/notification-providers/notification-provider-factory";
+import { getCriterionFactory } from "./implementations/criteria/criterion-factory";
 
 function requireEnv(key: string): string {
   const value = process.env[key];
@@ -29,6 +31,7 @@ function parseDataProvider(value: string | undefined): "ngx_pulse" | "mock" {
 async function main(): Promise<void> {
   const botToken = requireEnv("TELEGRAM_BOT_TOKEN");
   const allowedUserIds = parseAllowedUserIds(process.env["TELEGRAM_ALLOWED_USERS"]);
+  const openAccess = process.env["TELEGRAM_OPEN_ACCESS"] === "true";
 
   getAIProviderFactory({
     defaultProvider: parseAIProvider(process.env["AI_PROVIDER"]),
@@ -38,7 +41,7 @@ async function main(): Promise<void> {
     },
   });
 
-  getDataProviderFactory({
+  const dataFactory = getDataProviderFactory({
     primaryProvider: parseDataProvider(process.env["DATA_PROVIDER"]),
     configs: {
       ngx_pulse: { apiKey: process.env["NGX_PULSE_API_KEY"] },
@@ -52,8 +55,13 @@ async function main(): Promise<void> {
     },
   });
 
-  const openAccess = process.env["TELEGRAM_OPEN_ACCESS"] === "true";
-  const bot = new TelegramBot({ token: botToken, allowedUserIds, openAccess });
+  const criterionFactory = getCriterionFactory();
+  await criterionFactory.initializeAll();
+
+  const stockProvider = await dataFactory.getStockProvider();
+  const stockService = new StockService(stockProvider, criterionFactory);
+
+  const bot = new TelegramBot({ token: botToken, allowedUserIds, openAccess }, stockService);
   await bot.launch();
 }
 
