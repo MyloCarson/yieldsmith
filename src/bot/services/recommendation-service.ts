@@ -40,7 +40,7 @@ export class RecommendationService {
       criteriaResults,
       {
         strategyId: "dividend_growth",
-        strategyName: "Dividend Growth",
+        strategyName: "Dividend Growth Strategy",
         marketSentiment: "neutral",
         userRiskTolerance: riskTolerance,
       }

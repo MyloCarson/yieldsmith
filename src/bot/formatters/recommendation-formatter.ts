@@ -80,7 +80,8 @@ export function formatRecommendation(result: RecommendationResult): string {
 }
 
 function buildScoreBar(score: number): string {
-  const filled = Math.round(score * 5);
+  const clamped = Number.isFinite(score) ? Math.min(1, Math.max(0, score)) : 0;
+  const filled = Math.round(clamped * 5);
   return "█".repeat(filled) + "░".repeat(5 - filled);
 }
 
