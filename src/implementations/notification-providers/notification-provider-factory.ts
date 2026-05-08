@@ -80,6 +80,7 @@ export class NotificationProviderFactory implements INotificationProviderFactory
     })()
       .catch((error: unknown) => {
         this.initPromises.delete(providerType);
+        if (error instanceof ProviderFactoryError) throw error;
         throw new ProviderFactoryError(
           "NotificationProvider",
           providerType,
@@ -113,6 +114,15 @@ export class NotificationProviderFactory implements INotificationProviderFactory
   }
 
   registerProvider(provider: INotificationProvider): void {
+    if (!this.registry.has(provider.id)) {
+      throw new ProviderFactoryError(
+        "NotificationProvider",
+        provider.id,
+        new Error(
+          `Cannot register provider with unknown id "${provider.id}". Register its constructor first.`
+        )
+      );
+    }
     if (this.instances.has(provider.id)) return;
     this.instances.set(provider.id, provider);
   }

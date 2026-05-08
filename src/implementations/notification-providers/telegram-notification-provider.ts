@@ -24,6 +24,13 @@ const TELEGRAM_MAX_BUTTONS_TOTAL = 100;
 const TELEGRAM_MAX_CALLBACK_DATA_BYTES = 64;
 const SENT_AT_MAP_MAX_SIZE = 1000;
 
+const PRIORITY_EMOJI: Record<AlertPriority, string> = {
+  low: "🔵",
+  medium: "🟡",
+  high: "🟠",
+  urgent: "🔴",
+};
+
 export class TelegramNotificationProvider extends BaseNotificationProvider {
   readonly id = "telegram";
   readonly name = "Telegram";
@@ -55,13 +62,7 @@ export class TelegramNotificationProvider extends BaseNotificationProvider {
   }
 
   private formatMessage(title: string, message: string, priority?: AlertPriority): string {
-    const priorityEmoji: Record<AlertPriority, string> = {
-      low: "🔵",
-      medium: "🟡",
-      high: "🟠",
-      urgent: "🔴",
-    };
-    const emoji = priority ? priorityEmoji[priority] : "";
+    const emoji = priority ? PRIORITY_EMOJI[priority] : "";
     return `${emoji ? `${emoji} ` : ""}<b>${escapeHtml(title)}</b>\n\n${escapeHtml(message)}`;
   }
 
@@ -276,15 +277,9 @@ function buildInlineKeyboard(buttons: NotificationButton[]): InlineKeyboardButto
 }
 
 function buildRichText(content: RichNotificationContent, priority?: AlertPriority): string {
-  const priorityEmoji: Record<AlertPriority, string> = {
-    low: "🔵",
-    medium: "🟡",
-    high: "🟠",
-    urgent: "🔴",
-  };
   const lines: string[] = [];
 
-  if (priority) lines.push(priorityEmoji[priority]);
+  if (priority) lines.push(PRIORITY_EMOJI[priority]);
   lines.push(`<b>${escapeHtml(content.title)}</b>`);
   if (content.description) lines.push(`\n${escapeHtml(content.description)}`);
 
