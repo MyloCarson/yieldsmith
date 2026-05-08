@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import {
   PortfolioStock,
   PortfolioContext,
@@ -24,7 +24,7 @@ export interface GeminiAIProviderConfig {
   model?: string;
 }
 
-const DEFAULT_MODEL = "gemini-1.5-pro";
+const DEFAULT_MODEL = "gemini-2.5-pro";
 
 export class GeminiAIProvider extends BaseAIProvider {
   readonly id = "gemini";
@@ -32,12 +32,15 @@ export class GeminiAIProvider extends BaseAIProvider {
   readonly model: string;
 
   private readonly apiKey: string | undefined;
-  private genAI: GoogleGenerativeAI | null = null;
+  private client: GoogleGenAI | null = null;
 
   constructor(config?: GeminiAIProviderConfig) {
     super();
     this.apiKey =
-      config?.apiKey ?? process.env["GEMINI_API_KEY"] ?? process.env["GOOGLE_AI_API_KEY"];
+      config?.apiKey ??
+      process.env["GEMINI_API_KEY"] ??
+      process.env["GOOGLE_API_KEY"] ??
+      process.env["GOOGLE_AI_API_KEY"];
     this.model = config?.model ?? DEFAULT_MODEL;
   }
 
@@ -47,20 +50,27 @@ export class GeminiAIProvider extends BaseAIProvider {
 
   async initialize(): Promise<void> {
     await super.initialize();
-    this.genAI = new GoogleGenerativeAI(this.apiKey!);
+    this.client = new GoogleGenAI({ apiKey: this.apiKey });
   }
 
-  private getModel(): GenerativeModel {
+  private getClient(): GoogleGenAI {
     this.ensureInitialized();
-    if (!this.genAI) {
+    if (!this.client) {
       throw new AIProviderError("NOT_INITIALIZED", "Gemini client not created");
     }
-    return this.genAI.getGenerativeModel({ model: this.model });
+    return this.client;
   }
 
   private async ask(prompt: string): Promise<string> {
-    const result = await this.getModel().generateContent(prompt);
-    return result.response.text();
+    const response = await this.getClient().models.generateContent({
+      model: this.model,
+      contents: prompt,
+    });
+    const text = response.text;
+    if (!text) {
+      throw new AIProviderError("EMPTY_RESPONSE", "Gemini returned no text content");
+    }
+    return text;
   }
 
   private parseJSON<T>(raw: string): T {
@@ -184,9 +194,12 @@ ${JSON.stringify(indicator, null, 2)}`;
 
   async healthCheck(): Promise<HealthCheckResult> {
     try {
-      const result = await this.getModel().generateContent("ping");
+      const response = await this.getClient().models.generateContent({
+        model: this.model,
+        contents: "ping",
+      });
       return {
-        healthy: !!result.response.text(),
+        healthy: !!response.text,
         status: "operational",
         lastCheck: new Date(),
       };
@@ -208,8 +221,8 @@ ${JSON.stringify(indicator, null, 2)}`;
       supportsCriteriaValidation: true,
       supportsRiskAssessment: true,
       supportsNaturalLanguageInput: true,
-      maxTokensPerRequest: 8192,
-      supportedModels: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"],
+      maxTokensPerRequest: 65536,
+      supportedModels: ["gemini-2.5-pro", "gemini-2.5-flash"],
       concurrentRequests: 10,
     };
   }
