@@ -63,7 +63,14 @@ export class EarningsGrowthCriterion extends GrowthCriterion {
     const explanation = this.buildExplanation(cagr, isAcceptable);
 
     return Promise.resolve(
-      this.createEvaluation(context, isAcceptable, score, cagr * 100, explanation, this.getThresholds())
+      this.createEvaluation(
+        context,
+        isAcceptable,
+        score,
+        cagr * 100,
+        explanation,
+        this.getThresholds()
+      )
     );
   }
 
