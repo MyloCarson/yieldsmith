@@ -15,6 +15,10 @@
 import { EvaluationContext, StrategyEvaluation, StrategyType } from "@core/strategy";
 import { CriterionEvaluation } from "@core/criterion";
 import { StrategyError } from "@core/errors";
+import { Score } from "@/types/common";
+import { DividendYieldCriterion } from "../criteria/dividend-yield-criterion";
+import { DividendGrowthCriterion } from "../criteria/dividend-growth-criterion";
+import { PayoutRatioCriterion } from "../criteria/payout-ratio-criterion";
 import { BaseStrategy } from "./base-strategy";
 
 /**
@@ -26,6 +30,14 @@ export class DividendGrowthStrategy extends BaseStrategy {
   readonly description =
     "Targets stocks with consistent dividend growth and sustainable payouts for long-term capital appreciation and income";
   readonly recommendedHoldingPeriod = 1825; // 5 years in days
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    this.addCriterion(new DividendYieldCriterion(), 0.3 as Score);
+    this.addCriterion(new DividendGrowthCriterion(), 0.4 as Score);
+    this.addCriterion(new PayoutRatioCriterion(), 0.3 as Score);
+    await super.initialize();
+  }
 
   /**
    * Evaluate stock for dividend growth suitability

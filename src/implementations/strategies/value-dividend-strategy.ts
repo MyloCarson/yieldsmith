@@ -15,6 +15,13 @@
 import { EvaluationContext, StrategyEvaluation, StrategyType } from "@core/strategy";
 import { CriterionEvaluation } from "@core/criterion";
 import { StrategyError } from "@core/errors";
+import { Score } from "@/types/common";
+import { PERatioCriterion } from "../criteria/pe-ratio-criterion";
+import { BookValueCriterion } from "../criteria/book-value-criterion";
+import { DividendYieldCriterion } from "../criteria/dividend-yield-criterion";
+import { DebtToEquityCriterion } from "../criteria/debt-to-equity-criterion";
+import { DividendCoverageCriterion } from "../criteria/dividend-coverage-criterion";
+import { EarningsGrowthCriterion } from "../criteria/earnings-growth-criterion";
 import { BaseStrategy } from "./base-strategy";
 
 /**
@@ -26,6 +33,17 @@ export class ValueDividendStrategy extends BaseStrategy {
   readonly description =
     "Combines value investing principles with dividend requirements to find undervalued dividend payers with margin of safety";
   readonly recommendedHoldingPeriod = 1095; // 3 years in days
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    this.addCriterion(new PERatioCriterion(), 0.2 as Score);
+    this.addCriterion(new BookValueCriterion(), 0.2 as Score);
+    this.addCriterion(new DividendYieldCriterion(), 0.2 as Score);
+    this.addCriterion(new DebtToEquityCriterion(), 0.15 as Score);
+    this.addCriterion(new DividendCoverageCriterion(), 0.15 as Score);
+    this.addCriterion(new EarningsGrowthCriterion(), 0.1 as Score);
+    await super.initialize();
+  }
 
   /**
    * Evaluate stock for value dividend suitability

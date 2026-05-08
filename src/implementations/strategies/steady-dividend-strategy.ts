@@ -15,6 +15,11 @@
 import { EvaluationContext, StrategyEvaluation, StrategyType } from "@core/strategy";
 import { CriterionEvaluation } from "@core/criterion";
 import { StrategyError } from "@core/errors";
+import { Score } from "@/types/common";
+import { DividendYieldCriterion } from "../criteria/dividend-yield-criterion";
+import { DividendGrowthCriterion } from "../criteria/dividend-growth-criterion";
+import { PayoutRatioCriterion } from "../criteria/payout-ratio-criterion";
+import { LiquidityCriterion } from "../criteria/liquidity-criterion";
 import { BaseStrategy } from "./base-strategy";
 
 /**
@@ -26,6 +31,15 @@ export class SteadyDividendStrategy extends BaseStrategy {
   readonly description =
     "Focuses on stable blue-chip stocks with reliable, sustainable high dividend yields for consistent income";
   readonly recommendedHoldingPeriod = 1095; // 3 years in days
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    this.addCriterion(new DividendYieldCriterion(), 0.4 as Score);
+    this.addCriterion(new PayoutRatioCriterion(), 0.3 as Score);
+    this.addCriterion(new DividendGrowthCriterion(), 0.15 as Score);
+    this.addCriterion(new LiquidityCriterion(), 0.15 as Score);
+    await super.initialize();
+  }
 
   /**
    * Evaluate stock for steady dividend suitability

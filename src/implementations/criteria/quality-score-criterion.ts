@@ -29,11 +29,12 @@ export class QualityScoreCriterion extends GrowthCriterion {
   protected validateRequiredFields(context: CriterionContext): void {
     const missingFields: string[] = [];
     const extData = context.stockData as unknown as
-      | { eps?: number; roe?: number; debt?: number }
+      | { eps?: number; roe?: number; debt?: number; equity?: number }
       | undefined;
     if (extData?.eps == null) missingFields.push("stockData.eps");
     if (extData?.roe == null) missingFields.push("stockData.roe");
     if (extData?.debt == null) missingFields.push("stockData.debt");
+    if (extData?.equity == null) missingFields.push("stockData.equity");
     if (missingFields.length > 0) {
       throw new CriterionValidationError(this.name, missingFields);
     }

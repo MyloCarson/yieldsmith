@@ -63,7 +63,7 @@ export class EarningsGrowthCriterion extends GrowthCriterion {
     const explanation = this.buildExplanation(cagr, isAcceptable);
 
     return Promise.resolve(
-      this.createEvaluation(context, isAcceptable, score, cagr, explanation, this.getThresholds())
+      this.createEvaluation(context, isAcceptable, score, cagr * 100, explanation, this.getThresholds())
     );
   }
 
@@ -71,9 +71,9 @@ export class EarningsGrowthCriterion extends GrowthCriterion {
     return {
       name: this.name,
       description: "Earnings CAGR (%)",
-      min: this.config.minGrowthCAGR,
-      max: this.config.maxGrowthCAGR,
-      target: this.config.targetGrowthCAGR,
+      min: this.config.minGrowthCAGR * 100,
+      max: this.config.maxGrowthCAGR * 100,
+      target: this.config.targetGrowthCAGR * 100,
       unit: "%",
     };
   }
