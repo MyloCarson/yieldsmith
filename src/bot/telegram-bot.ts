@@ -5,12 +5,18 @@ import { createErrorHandlerMiddleware } from "./middleware/error-handler.middlew
 import { handleStart } from "./commands/start.command";
 import { handleHelp } from "./commands/help.command";
 import { handleHealth } from "./commands/health.command";
+import { createStockHealthHandler } from "./commands/stock-health.command";
+import { createExploreHandler } from "./commands/explore.command";
+import { StockService } from "./services/stock-service";
 
 export class TelegramBot {
   private readonly bot: Telegraf<BotContext>;
   private running = false;
 
-  constructor(config: BotConfig) {
+  constructor(
+    config: BotConfig,
+    private readonly stockService: StockService
+  ) {
     this.bot = new Telegraf<BotContext>(config.token);
     this.registerMiddleware(config);
     this.registerCommands();
@@ -35,6 +41,8 @@ export class TelegramBot {
     this.bot.command("start", (ctx) => handleStart(ctx));
     this.bot.command("help", (ctx) => handleHelp(ctx));
     this.bot.command("health", (ctx) => handleHealth(ctx));
+    this.bot.command("stock_health", createStockHealthHandler(this.stockService));
+    this.bot.command("explore", createExploreHandler(this.stockService));
 
     this.bot.on("text", async (ctx) => {
       if (ctx.message.text.startsWith("/")) {
