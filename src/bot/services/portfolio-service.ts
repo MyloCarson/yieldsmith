@@ -95,7 +95,7 @@ export class PortfolioService {
 
   async addHolding(userId: TelegramUserId, input: CreateHoldingInput): Promise<PortfolioHolding> {
     const valid = await this.provider.validateSymbol(input.symbol);
-    if (!valid) throw new Error(`Symbol "${input.symbol}" not found on NGX`);
+    if (!valid) throw new Error(`Symbol "${input.symbol}" not found on ${input.market_id}`);
 
     // 1. Insert the new lot
     const lotResult = await this.db.from("portfolio_lots").insert({
