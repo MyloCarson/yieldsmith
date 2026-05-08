@@ -16,7 +16,7 @@ export interface INotificationProvider {
    * Provider identifier
    * e.g., "telegram", "slack", "discord", "email"
    */
-  readonly id: NotificationProviderType;
+  readonly id: string;
 
   /**
    * Provider display name
