@@ -6,6 +6,7 @@
 
 import { NotificationProviderType } from "@/types/notifications";
 import { AlertPriority } from "@/types/alerts";
+import { HealthCheckResult } from "./market";
 
 /**
  * Notification provider implementation contract
@@ -367,45 +368,7 @@ export interface RateLimitInfo {
   windowSeconds: number;
 }
 
-/**
- * Health check result
- */
-export interface HealthCheckResult {
-  /**
-   * Whether provider is healthy
-   */
-  healthy: boolean;
-
-  /**
-   * Service status
-   */
-  status: "operational" | "degraded" | "down";
-
-  /**
-   * When the check was performed
-   */
-  lastCheck: Date;
-
-  /**
-   * Response time in milliseconds
-   */
-  responseTime?: number;
-
-  /**
-   * Any error message
-   */
-  error?: string;
-
-  /**
-   * Configuration validation status
-   */
-  configValid?: boolean;
-
-  /**
-   * Authentication status
-   */
-  authenticated?: boolean;
-}
+export { HealthCheckResult };
 
 /**
  * Notification provider capabilities

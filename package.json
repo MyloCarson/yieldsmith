@@ -38,6 +38,8 @@
     "@google/generative-ai": "^0.5.0",
     "@supabase/supabase-js": "^2.43.0",
     "axios": "^1.7.2",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
     "dotenv": "^16.4.5",
     "pino": "^8.19.0",
     "pino-pretty": "^10.3.1",
