@@ -1,6 +1,7 @@
 import { BotContext } from "../types";
 import { StockService } from "../services/stock-service";
 import { formatStockEvaluation } from "../formatters/criterion-formatter";
+import { escapeHtml } from "@/utils/html";
 import { StockSymbol, MarketId } from "@/types/common";
 
 export function createStockHealthHandler(stockService: StockService) {
@@ -23,7 +24,7 @@ export function createStockHealthHandler(stockService: StockService) {
       return;
     }
 
-    await ctx.replyWithHTML(`<b>🔍 Analysing ${symbol}...</b>`);
+    await ctx.replyWithHTML(`<b>🔍 Analysing ${escapeHtml(String(symbol))}...</b>`);
 
     const result = await stockService.evaluateStock(symbol, marketId);
     await ctx.replyWithHTML(formatStockEvaluation(result));

@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { StockSymbol, MarketId } from "@/types/common";
 import { IStockDataProvider } from "@core/data-provider";
-import { CriterionContext, CriterionEvaluation } from "@core/criterion";
+import { CriterionContext, CriterionEvaluation, CriterionStockData } from "@core/criterion";
 import { CriterionFactory } from "@/implementations/criteria/criterion-factory";
 import { safeDiv } from "@/utils/math";
 
@@ -86,9 +86,9 @@ export class StockService {
     const searchResults = await this.provider.searchStocks("", 50);
     const candidates: ExploreCandidate[] = [];
 
-    const BATCH_SIZE = 5;
-    for (let i = 0; i < searchResults.length; i += BATCH_SIZE) {
-      const batch = searchResults.slice(i, i + BATCH_SIZE);
+    const batchSize = 5;
+    for (let i = 0; i < searchResults.length; i += batchSize) {
+      const batch = searchResults.slice(i, i + batchSize);
       const batchResults = await Promise.all(
         batch.map(async (result) => {
           try {
@@ -157,6 +157,26 @@ export class StockService {
   }
 }
 
+function calcAnnualizedVolatility(prices: Array<{ close: number }>): number | undefined {
+  if (prices.length < 2) return undefined;
+  const returns: number[] = [];
+  for (let i = 1; i < prices.length; i++) {
+    const prev = prices[i - 1].close;
+    const curr = prices[i].close;
+    if (prev > 0) returns.push(Math.log(curr / prev));
+  }
+  if (returns.length < 2) return undefined;
+  const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
+  const variance = returns.reduce((s, r) => s + (r - mean) ** 2, 0) / (returns.length - 1);
+  return Math.sqrt(variance * 252);
+}
+
+function calcAvgDailyVolume(prices: Array<{ volume?: number }>): number | undefined {
+  const volumes = prices.map((p) => p.volume).filter((v): v is number => v != null);
+  if (volumes.length === 0) return undefined;
+  return volumes.reduce((s, v) => s + v, 0) / volumes.length;
+}
+
 function buildCriterionContext(
   symbol: StockSymbol,
   marketId: MarketId,
@@ -169,6 +189,16 @@ function buildCriterionContext(
   const dividendYield = latestDividend
     ? safeDiv(latestDividend.dividend_per_share, currentPrice)
     : undefined;
+
+  const annualizedVolatility = calcAnnualizedVolatility(historicalPrices);
+  const averageDailyVolume = calcAvgDailyVolume(historicalPrices);
+
+  // Extra fields accessed via `as unknown` casts in specific criteria that extend CriterionStockData
+  const extraStockFields: Record<string, number> = {};
+  if (annualizedVolatility != null) extraStockFields["volatility"] = annualizedVolatility;
+  if (averageDailyVolume != null) extraStockFields["averageDailyVolume"] = averageDailyVolume;
+  if (financials?.debt != null) extraStockFields["debt"] = financials.debt;
+  if (financials?.equity != null) extraStockFields["equity"] = financials.equity;
 
   return {
     symbol,
@@ -183,7 +213,8 @@ function buildCriterionContext(
       bookValue: financials?.book_value,
       revenue: financials?.revenue,
       netIncome: financials?.net_income,
-    },
+      ...extraStockFields,
+    } as CriterionStockData,
     financials: financials
       ? {
           eps: financials.eps,
