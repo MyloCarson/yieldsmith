@@ -1,6 +1,6 @@
 import { Telegraf } from "telegraf";
 import { BotConfig, BotContext } from "./types";
-import { createAuthMiddleware } from "./middleware/auth.middleware";
+import { createAuthMiddleware, warnIfOpenAccess } from "./middleware/auth.middleware";
 import { createErrorHandlerMiddleware } from "./middleware/error-handler.middleware";
 import { handleStart } from "./commands/start.command";
 import { handleHelp } from "./commands/help.command";
@@ -19,8 +19,10 @@ export class TelegramBot {
   private registerMiddleware(config: BotConfig): void {
     this.bot.use(createErrorHandlerMiddleware());
 
-    if (config.allowedUserIds && config.allowedUserIds.length > 0) {
-      this.bot.use(createAuthMiddleware(config.allowedUserIds));
+    const allowedUserIds = config.allowedUserIds ?? [];
+    warnIfOpenAccess(allowedUserIds);
+    if (allowedUserIds.length > 0) {
+      this.bot.use(createAuthMiddleware(allowedUserIds));
     }
   }
 

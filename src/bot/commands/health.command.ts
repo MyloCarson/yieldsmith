@@ -1,4 +1,5 @@
 import { BotContext } from "../types";
+import { escapeHtml } from "../utils/html";
 import { getAIProviderFactory } from "@/implementations/ai-providers/ai-provider-factory";
 import { getDataProviderFactory } from "@/implementations/data-providers/data-provider-factory";
 import { getNotificationProviderFactory } from "@/implementations/notification-providers/notification-provider-factory";
@@ -27,13 +28,15 @@ interface ProviderStatus {
   healthy: boolean;
   label: string;
   status: string;
-  error?: string;
+  failed?: boolean;
 }
 
 function formatStatus(name: string, result: ProviderStatus): string {
   const icon = result.healthy ? "✅" : "❌";
-  const detail = result.error ? ` — ${result.error}` : ` (${result.status})`;
-  return `${icon} <b>${name}</b>: ${result.label}${detail}`;
+  const detail = result.failed
+    ? "unavailable"
+    : `${escapeHtml(result.label)} (${escapeHtml(result.status)})`;
+  return `${icon} <b>${escapeHtml(name)}</b>: ${detail}`;
 }
 
 async function checkAIProvider(): Promise<ProviderStatus> {
@@ -41,19 +44,10 @@ async function checkAIProvider(): Promise<ProviderStatus> {
     const factory = getAIProviderFactory();
     const provider = await factory.getDefaultProvider();
     const result = await provider.healthCheck();
-    return {
-      healthy: result.healthy,
-      label: provider.name,
-      status: result.status,
-      error: result.error,
-    };
+    return { healthy: result.healthy, label: provider.name, status: result.status };
   } catch (error) {
-    return {
-      healthy: false,
-      label: "unavailable",
-      status: "down",
-      error: error instanceof Error ? error.message : "unknown error",
-    };
+    process.stderr.write(`[health] AI provider check failed: ${String(error)}\n`);
+    return { healthy: false, label: "unavailable", status: "down", failed: true };
   }
 }
 
@@ -61,18 +55,10 @@ async function checkDataProvider(): Promise<ProviderStatus> {
   try {
     const factory = getDataProviderFactory();
     const result = await factory.healthCheck();
-    return {
-      healthy: result.healthy,
-      label: result.primaryProvider,
-      status: result.status,
-    };
+    return { healthy: result.healthy, label: result.primaryProvider, status: result.status };
   } catch (error) {
-    return {
-      healthy: false,
-      label: "unavailable",
-      status: "down",
-      error: error instanceof Error ? error.message : "unknown error",
-    };
+    process.stderr.write(`[health] Data provider check failed: ${String(error)}\n`);
+    return { healthy: false, label: "unavailable", status: "down", failed: true };
   }
 }
 
@@ -81,18 +67,9 @@ async function checkNotificationProvider(): Promise<ProviderStatus> {
     const factory = getNotificationProviderFactory();
     const provider = await factory.getDefaultProvider();
     const result = await provider.healthCheck();
-    return {
-      healthy: result.healthy,
-      label: provider.name,
-      status: result.status,
-      error: result.error,
-    };
+    return { healthy: result.healthy, label: provider.name, status: result.status };
   } catch (error) {
-    return {
-      healthy: false,
-      label: "unavailable",
-      status: "down",
-      error: error instanceof Error ? error.message : "unknown error",
-    };
+    process.stderr.write(`[health] Notification provider check failed: ${String(error)}\n`);
+    return { healthy: false, label: "unavailable", status: "down", failed: true };
   }
 }

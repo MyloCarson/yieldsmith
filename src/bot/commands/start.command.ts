@@ -1,7 +1,8 @@
 import { BotContext } from "../types";
+import { escapeHtml } from "../utils/html";
 
 export async function handleStart(ctx: BotContext): Promise<void> {
-  const firstName = ctx.from?.first_name ?? "there";
+  const firstName = escapeHtml(ctx.from?.first_name ?? "there");
   await ctx.replyWithHTML(
     `👋 <b>Welcome to Yieldsmith, ${firstName}!</b>\n\n` +
       `I help you monitor NGX dividend stocks and build a passive income portfolio.\n\n` +

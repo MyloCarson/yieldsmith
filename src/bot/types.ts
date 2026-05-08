@@ -14,5 +14,4 @@ export interface BotContext extends Context {
 export interface BotConfig {
   token: string;
   allowedUserIds?: TelegramUserId[];
-  pollingTimeoutSeconds?: number;
 }

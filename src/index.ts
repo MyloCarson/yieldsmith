@@ -10,13 +10,28 @@ function requireEnv(key: string): string {
   return value;
 }
 
+function parseAIProvider(value: string | undefined): "claude" | "gemini" {
+  if (value === "claude" || value === "gemini") return value;
+  if (value) {
+    process.stderr.write(`[WARN] Unknown AI_PROVIDER "${value}", falling back to "claude".\n`);
+  }
+  return "claude";
+}
+
+function parseDataProvider(value: string | undefined): "ngx_pulse" | "mock" {
+  if (value === "ngx_pulse" || value === "mock") return value;
+  if (value) {
+    process.stderr.write(`[WARN] Unknown DATA_PROVIDER "${value}", falling back to "ngx_pulse".\n`);
+  }
+  return "ngx_pulse";
+}
+
 async function main(): Promise<void> {
   const botToken = requireEnv("TELEGRAM_BOT_TOKEN");
   const allowedUserIds = parseAllowedUserIds(process.env["TELEGRAM_ALLOWED_USERS"]);
 
-  // Initialise global factories so /health can reach them
   getAIProviderFactory({
-    defaultProvider: (process.env["AI_PROVIDER"] as "claude" | "gemini") ?? "claude",
+    defaultProvider: parseAIProvider(process.env["AI_PROVIDER"]),
     configs: {
       claude: { apiKey: process.env["ANTHROPIC_API_KEY"] },
       gemini: { apiKey: process.env["GEMINI_API_KEY"] },
@@ -24,7 +39,7 @@ async function main(): Promise<void> {
   });
 
   getDataProviderFactory({
-    primaryProvider: (process.env["DATA_PROVIDER"] as "ngx_pulse" | "mock") ?? "ngx_pulse",
+    primaryProvider: parseDataProvider(process.env["DATA_PROVIDER"]),
     configs: {
       ngx_pulse: { apiKey: process.env["NGX_PULSE_API_KEY"] },
     },
@@ -37,15 +52,11 @@ async function main(): Promise<void> {
     },
   });
 
-  const bot = new TelegramBot({
-    token: botToken,
-    allowedUserIds,
-  });
-
+  const bot = new TelegramBot({ token: botToken, allowedUserIds });
   await bot.launch();
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error);
+  process.stderr.write(`Fatal error: ${String(error)}\n`);
   process.exit(1);
 });
