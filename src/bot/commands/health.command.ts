@@ -1,5 +1,5 @@
 import { BotContext } from "../types";
-import { escapeHtml } from "../utils/html";
+import { escapeHtml } from "@/utils/html";
 import { getAIProviderFactory } from "@/implementations/ai-providers/ai-provider-factory";
 import { getDataProviderFactory } from "@/implementations/data-providers/data-provider-factory";
 import { getNotificationProviderFactory } from "@/implementations/notification-providers/notification-provider-factory";

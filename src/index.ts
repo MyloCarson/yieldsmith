@@ -52,7 +52,8 @@ async function main(): Promise<void> {
     },
   });
 
-  const bot = new TelegramBot({ token: botToken, allowedUserIds });
+  const openAccess = process.env["TELEGRAM_OPEN_ACCESS"] === "true";
+  const bot = new TelegramBot({ token: botToken, allowedUserIds, openAccess });
   await bot.launch();
 }
 

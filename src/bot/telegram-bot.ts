@@ -1,6 +1,6 @@
 import { Telegraf } from "telegraf";
 import { BotConfig, BotContext } from "./types";
-import { createAuthMiddleware, warnIfOpenAccess } from "./middleware/auth.middleware";
+import { createAuthMiddleware, createDenyAllMiddleware } from "./middleware/auth.middleware";
 import { createErrorHandlerMiddleware } from "./middleware/error-handler.middleware";
 import { handleStart } from "./commands/start.command";
 import { handleHelp } from "./commands/help.command";
@@ -20,9 +20,14 @@ export class TelegramBot {
     this.bot.use(createErrorHandlerMiddleware());
 
     const allowedUserIds = config.allowedUserIds ?? [];
-    warnIfOpenAccess(allowedUserIds);
     if (allowedUserIds.length > 0) {
       this.bot.use(createAuthMiddleware(allowedUserIds));
+    } else if (config.openAccess) {
+      process.stderr.write(
+        "[WARN] TELEGRAM_OPEN_ACCESS=true — bot is open to ALL Telegram users.\n"
+      );
+    } else {
+      this.bot.use(createDenyAllMiddleware());
     }
   }
 

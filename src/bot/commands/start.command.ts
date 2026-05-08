@@ -1,5 +1,5 @@
 import { BotContext } from "../types";
-import { escapeHtml } from "../utils/html";
+import { escapeHtml } from "@/utils/html";
 
 export async function handleStart(ctx: BotContext): Promise<void> {
   const firstName = escapeHtml(ctx.from?.first_name ?? "there");
