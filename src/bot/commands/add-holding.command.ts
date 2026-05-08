@@ -1,3 +1,4 @@
+import * as chrono from "chrono-node";
 import { format } from "date-fns";
 import { BotContext } from "../types";
 import { PortfolioService } from "../services/portfolio-service";
@@ -17,7 +18,9 @@ export function createAddHoldingHandler(portfolioService: PortfolioService) {
 
     if (parts.length < 4) {
       await ctx.reply(
-        "Usage: /add_holding <SYMBOL> <QUANTITY> <PRICE> [<YYYY-MM-DD>]\n" +
+        "Usage: /add_holding <SYMBOL> <QUANTITY> <PRICE> [<DATE>]\n" +
+          "Example: /add_holding MTNN 100 24.50 today\n" +
+          "Example: /add_holding MTNN 100 24.50 last Thursday\n" +
           "Example: /add_holding MTNN 100 24.50 2025-01-15"
       );
       return;
@@ -26,7 +29,10 @@ export function createAddHoldingHandler(portfolioService: PortfolioService) {
     const symbol = parts[1].toUpperCase() as StockSymbol;
     const quantity = parseFloat(parts[2]);
     const purchasePrice = parseFloat(parts[3]);
-    const purchaseDateRaw = parts[4] ?? format(new Date(), "yyyy-MM-dd");
+
+    // Everything after the price is treated as the date string
+    const dateInput = parts.slice(4).join(" ") || "today";
+    const parsedDate = chrono.parseDate(dateInput, new Date(), { forwardDate: false });
 
     if (isNaN(quantity) || quantity <= 0) {
       await ctx.reply("Quantity must be a positive number. Example: 100");
@@ -38,10 +44,19 @@ export function createAddHoldingHandler(portfolioService: PortfolioService) {
       return;
     }
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(purchaseDateRaw)) {
-      await ctx.reply("Date must be in YYYY-MM-DD format. Example: 2025-01-15");
+    if (!parsedDate) {
+      await ctx.reply(
+        `Couldn't understand the date "${dateInput}". Try: today, yesterday, last Monday, 3 weeks ago, or 2025-01-15`
+      );
       return;
     }
+
+    if (parsedDate > new Date()) {
+      await ctx.reply("Purchase date can't be in the future.");
+      return;
+    }
+
+    const purchaseDate = format(parsedDate, "yyyy-MM-dd");
 
     await ctx.replyWithHTML(`<b>➕ Adding ${symbol}...</b>`);
 
@@ -50,7 +65,7 @@ export function createAddHoldingHandler(portfolioService: PortfolioService) {
       market_id: "ngx" as MarketId,
       quantity,
       purchase_price: purchasePrice,
-      purchase_date: purchaseDateRaw,
+      purchase_date: purchaseDate,
     });
 
     const lots = await portfolioService.getLots(userId, symbol);

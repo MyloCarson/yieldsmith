@@ -10,7 +10,7 @@ export async function handleHelp(ctx: BotContext): Promise<void> {
       `/stock_health &lt;SYMBOL&gt; — Full stock analysis against all criteria\n` +
       `/explore — Discover top NGX dividend stocks\n` +
       `/portfolio — View your current holdings\n` +
-      `/add_holding &lt;SYMBOL&gt; &lt;QTY&gt; &lt;PRICE&gt; [&lt;DATE&gt;] — Add a stock to your portfolio\n` +
+      `/add_holding &lt;SYMBOL&gt; &lt;QTY&gt; &lt;PRICE&gt; [&lt;DATE&gt;] — Add a stock (date: "today", "last Monday", etc.)\n` +
       `/remove_holding &lt;SYMBOL&gt; — Remove a stock from your portfolio\n\n` +
       `<b>Coming soon — Portfolio</b>\n` +
       `/performance — Portfolio returns and metrics\n\n` +
