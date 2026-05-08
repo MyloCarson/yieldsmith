@@ -10,8 +10,8 @@ function requireEnv(key: string): string {
   return value;
 }
 
-function parseAIProvider(value: string | undefined): "claude" | "gemini" {
-  if (value === "claude" || value === "gemini") return value;
+function parseAIProvider(value: string | undefined): "claude" | "gemini" | "mock" {
+  if (value === "claude" || value === "gemini" || value === "mock") return value;
   if (value) {
     process.stderr.write(`[WARN] Unknown AI_PROVIDER "${value}", falling back to "claude".\n`);
   }

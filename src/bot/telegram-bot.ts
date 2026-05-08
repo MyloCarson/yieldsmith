@@ -31,16 +31,18 @@ export class TelegramBot {
     this.bot.command("help", (ctx) => handleHelp(ctx));
     this.bot.command("health", (ctx) => handleHealth(ctx));
 
-    this.bot.on("message", async (ctx) => {
-      await ctx.reply("Unknown command. Type /help to see available commands.");
+    this.bot.on("text", async (ctx) => {
+      if (ctx.message.text.startsWith("/")) {
+        await ctx.reply("Unknown command. Type /help to see available commands.");
+      }
     });
   }
 
   async launch(): Promise<void> {
     if (this.running) return;
-    this.running = true;
 
     await this.bot.launch();
+    this.running = true;
     process.stdout.write("Yieldsmith bot is running.\n");
 
     process.once("SIGINT", () => this.stop("SIGINT"));
