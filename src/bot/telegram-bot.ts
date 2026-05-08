@@ -10,8 +10,10 @@ import { createExploreHandler } from "./commands/explore.command";
 import { createPortfolioHandler } from "./commands/portfolio.command";
 import { createAddHoldingHandler } from "./commands/add-holding.command";
 import { createRemoveHoldingHandler } from "./commands/remove-holding.command";
+import { createRecommendHandler } from "./commands/recommend.command";
 import { StockService } from "./services/stock-service";
 import { PortfolioService } from "./services/portfolio-service";
+import { RecommendationService } from "./services/recommendation-service";
 
 export class TelegramBot {
   private readonly bot: Telegraf<BotContext>;
@@ -20,7 +22,8 @@ export class TelegramBot {
   constructor(
     config: BotConfig,
     private readonly stockService: StockService,
-    private readonly portfolioService: PortfolioService
+    private readonly portfolioService: PortfolioService,
+    private readonly recommendationService: RecommendationService
   ) {
     this.bot = new Telegraf<BotContext>(config.token);
     this.registerMiddleware(config);
@@ -51,6 +54,7 @@ export class TelegramBot {
     this.bot.command("portfolio", createPortfolioHandler(this.portfolioService));
     this.bot.command("add_holding", createAddHoldingHandler(this.portfolioService));
     this.bot.command("remove_holding", createRemoveHoldingHandler(this.portfolioService));
+    this.bot.command("recommend", createRecommendHandler(this.recommendationService));
 
     this.bot.on("text", async (ctx) => {
       if (ctx.message.text.startsWith("/")) {
