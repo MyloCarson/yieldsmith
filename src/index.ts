@@ -1,6 +1,8 @@
 import { TelegramBot } from "./bot/telegram-bot";
 import { parseAllowedUserIds } from "./bot/middleware/auth.middleware";
 import { StockService } from "./bot/services/stock-service";
+import { PortfolioService } from "./bot/services/portfolio-service";
+import { getSupabaseClient } from "./db/supabase-client";
 import { getAIProviderFactory } from "./implementations/ai-providers/ai-provider-factory";
 import { getDataProviderFactory } from "./implementations/data-providers/data-provider-factory";
 import { getNotificationProviderFactory } from "./implementations/notification-providers/notification-provider-factory";
@@ -30,6 +32,8 @@ function parseDataProvider(value: string | undefined): "ngx_pulse" | "mock" {
 
 async function main(): Promise<void> {
   const botToken = requireEnv("TELEGRAM_BOT_TOKEN");
+  requireEnv("SUPABASE_URL");
+  requireEnv("SUPABASE_SERVICE_ROLE_KEY");
   const allowedUserIds = parseAllowedUserIds(process.env["TELEGRAM_ALLOWED_USERS"]);
   const openAccess = process.env["TELEGRAM_OPEN_ACCESS"] === "true";
 
@@ -60,8 +64,13 @@ async function main(): Promise<void> {
 
   const stockProvider = await dataFactory.getStockProvider();
   const stockService = new StockService(stockProvider, criterionFactory);
+  const portfolioService = new PortfolioService(getSupabaseClient(), stockProvider);
 
-  const bot = new TelegramBot({ token: botToken, allowedUserIds, openAccess }, stockService);
+  const bot = new TelegramBot(
+    { token: botToken, allowedUserIds, openAccess },
+    stockService,
+    portfolioService
+  );
   await bot.launch();
 }
 
