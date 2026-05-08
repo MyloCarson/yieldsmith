@@ -2,6 +2,7 @@ import { TelegramBot } from "./bot/telegram-bot";
 import { parseAllowedUserIds } from "./bot/middleware/auth.middleware";
 import { StockService } from "./bot/services/stock-service";
 import { PortfolioService } from "./bot/services/portfolio-service";
+import { RecommendationService } from "./bot/services/recommendation-service";
 import { getSupabaseClient } from "./db/supabase-client";
 import { getAIProviderFactory } from "./implementations/ai-providers/ai-provider-factory";
 import { getDataProviderFactory } from "./implementations/data-providers/data-provider-factory";
@@ -63,13 +64,16 @@ async function main(): Promise<void> {
   await criterionFactory.initializeAll();
 
   const stockProvider = await dataFactory.getStockProvider();
+  const aiFactory = getAIProviderFactory();
   const stockService = new StockService(stockProvider, criterionFactory);
   const portfolioService = new PortfolioService(getSupabaseClient(), stockProvider);
+  const recommendationService = new RecommendationService(stockService, aiFactory);
 
   const bot = new TelegramBot(
     { token: botToken, allowedUserIds, openAccess },
     stockService,
-    portfolioService
+    portfolioService,
+    recommendationService
   );
   await bot.launch();
 }
