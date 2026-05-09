@@ -53,6 +53,7 @@ export interface StockSearchResult {
   marketId: MarketId;
   sector: string;
   lastPrice: number;
+  peRatio?: number;
   timestamp: Date;
 }
 

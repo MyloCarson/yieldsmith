@@ -14,6 +14,7 @@ import { createRecommendHandler } from "./commands/recommend.command";
 import { StockService } from "./services/stock-service";
 import { PortfolioService } from "./services/portfolio-service";
 import { RecommendationService } from "./services/recommendation-service";
+import { registerCallbacks } from "./callbacks/callback-router";
 
 export class TelegramBot {
   private readonly bot: Telegraf<BotContext>;
@@ -28,6 +29,7 @@ export class TelegramBot {
     this.bot = new Telegraf<BotContext>(config.token);
     this.registerMiddleware(config);
     this.registerCommands();
+    registerCallbacks(this.bot, this.stockService, this.portfolioService, this.recommendationService);
   }
 
   private registerMiddleware(config: BotConfig): void {
@@ -77,12 +79,17 @@ export class TelegramBot {
       { command: "remove_holding", description: "Remove a stock from your portfolio" },
     ]);
 
-    await this.bot.launch();
     this.running = true;
-    process.stdout.write("Yieldsmith bot is running.\n");
-
     process.once("SIGINT", () => this.stop("SIGINT"));
     process.once("SIGTERM", () => this.stop("SIGTERM"));
+
+    process.stdout.write("Yieldsmith bot is running.\n");
+    try {
+      await this.bot.launch();
+    } catch (error) {
+      this.running = false;
+      throw error;
+    }
   }
 
   stop(signal?: string): void {
