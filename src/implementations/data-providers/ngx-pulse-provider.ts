@@ -110,12 +110,12 @@ class RateLimiter {
     const recentMinute = this.timestamps.filter((t) => t > oneMinuteAgo).length;
     if (recentMinute >= this.perMinute) {
       const oldest = this.timestamps.filter((t) => t > oneMinuteAgo)[0] ?? now;
-      return Promise.reject(new RateLimitError(oldest + 60_000 - now));
+      return Promise.reject(new RateLimitError(oldest + 60_000));
     }
 
     if (this.timestamps.length >= this.perHour) {
       const oldest = this.timestamps[0] ?? now;
-      return Promise.reject(new RateLimitError(oldest + 3_600_000 - now));
+      return Promise.reject(new RateLimitError(oldest + 3_600_000));
     }
 
     this.timestamps.push(now);
@@ -170,7 +170,7 @@ export class DataProviderNGXPulse implements IStockDataProvider {
   }
 
   isConfigured(): boolean {
-    return this.config.apiKey.length > 0;
+    return this.config.apiKey.length > 0 && this.config.baseUrl.length > 0;
   }
 
   async initialize(): Promise<void> {
@@ -260,15 +260,17 @@ export class DataProviderNGXPulse implements IStockDataProvider {
       `/api/ngxdata/dividends/${encodeURIComponent(String(symbol))}?limit=all`
     );
 
-    const history: DividendData[] = data.map((row) => ({
-      symbol,
-      marketId,
-      dividend_per_share: row.dividend_per_share,
-      ex_dividend_date: row.ex_dividend_date as DateOnly,
-      payment_date: (row.pay_date ?? row.ex_dividend_date) as DateOnly,
-      announcement_date: row.ex_dividend_date as DateOnly,
-      dividend_type: "regular",
-    }));
+    const history: DividendData[] = data
+      .map((row) => ({
+        symbol,
+        marketId,
+        dividend_per_share: row.dividend_per_share,
+        ex_dividend_date: row.ex_dividend_date as DateOnly,
+        payment_date: (row.pay_date ?? row.ex_dividend_date) as DateOnly,
+        announcement_date: row.ex_dividend_date as DateOnly,
+        dividend_type: "regular" as const,
+      }))
+      .sort((a, b) => a.payment_date.localeCompare(b.payment_date));
 
     this.dividendCache.set(cacheKey, history);
     return history;
@@ -353,8 +355,8 @@ export class DataProviderNGXPulse implements IStockDataProvider {
       });
 
       if (response.status === 429) {
-        const retryAfter = Number(response.headers.get("Retry-After") ?? 60) * 1000;
-        throw new RateLimitError(retryAfter);
+        const retryAfterSecs = Number(response.headers.get("Retry-After") ?? 60);
+        throw new RateLimitError(Date.now() + retryAfterSecs * 1000);
       }
 
       if (!response.ok) {
