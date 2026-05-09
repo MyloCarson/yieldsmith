@@ -10,7 +10,7 @@ export function registerPortfolioCallbacks(
   portfolioService: PortfolioService
 ): void {
   bot.action(/^remove_confirm:(.+)$/, async (ctx) => {
-    const symbol = ctx.match![1] as StockSymbol;
+    const symbol = ctx.match[1] as StockSymbol;
     const userId = ctx.from?.id as TelegramUserId | undefined;
     if (!userId) {
       await ctx.answerCbQuery();

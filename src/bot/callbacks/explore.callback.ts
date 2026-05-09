@@ -68,7 +68,7 @@ export function registerExploreCallbacks(
       await ctx.answerCbQuery();
       return;
     }
-    const offset = parseInt(ctx.match![1], 10);
+    const offset = parseInt(ctx.match[1], 10);
     const candidates = getExploreCache(userId);
     if (!candidates) {
       await ctx.answerCbQuery("Session expired. Run /explore again.");

@@ -19,7 +19,7 @@ export function registerStockCallbacks(
   portfolioService: PortfolioService
 ): void {
   bot.action(/^stock_health:(.+)$/, async (ctx) => {
-    const symbol = ctx.match![1] as StockSymbol;
+    const symbol = ctx.match[1] as StockSymbol;
     await ctx.answerCbQuery();
     await sendTyping(ctx);
     const result = await stockService.evaluateStock(symbol, "ngx" as MarketId);
@@ -27,7 +27,7 @@ export function registerStockCallbacks(
   });
 
   bot.action(/^recommend:(.+)$/, async (ctx) => {
-    const symbol = ctx.match![1] as StockSymbol;
+    const symbol = ctx.match[1] as StockSymbol;
     await ctx.answerCbQuery();
     await ctx.replyWithHTML(
       `<b>🤖 Generating AI recommendation for ${escapeHtml(String(symbol))}...</b>`
@@ -38,7 +38,7 @@ export function registerStockCallbacks(
   });
 
   bot.action(/^add_to_portfolio:(.+)$/, async (ctx) => {
-    const symbol = ctx.match![1];
+    const symbol = ctx.match[1];
     await ctx.answerCbQuery();
     await ctx.reply(
       `Use the command below to add ${symbol} to your portfolio:\n\n` +
