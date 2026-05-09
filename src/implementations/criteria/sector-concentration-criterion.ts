@@ -33,7 +33,7 @@ const SECTOR_MAP: Record<string, string> = {
 export class SectorConcentrationCriterion extends RiskCriterion {
   readonly name = "sector_concentration";
   readonly displayName = "Sector Balance";
-  readonly description = "Adding this stock keeps your portfolio sectors balanced";
+  readonly description = "This sector is within your portfolio's target allocation";
   readonly weight: Score = 0.05 as Score;
 
   protected validateRequiredFields(context: CriterionContext): void {
@@ -106,7 +106,7 @@ export class SectorConcentrationCriterion extends RiskCriterion {
       score = 0.55 as Score;
       explanation =
         `${target.label} is at ${currentPct.toFixed(1)}% — approaching your ${maxPct.toFixed(0)}% limit. ` +
-        `You can still add this, but monitor your banking exposure after.`;
+        `You can still add this, but monitor your ${target.label.toLowerCase()} exposure after.`;
     } else {
       passed = true;
       const headroom = target.max - currentAlloc;
@@ -116,17 +116,24 @@ export class SectorConcentrationCriterion extends RiskCriterion {
     }
 
     return Promise.resolve(
-      this.createEvaluation(context, passed, score, currentAlloc, explanation, this.getThresholds())
+      this.createEvaluation(context, passed, score, currentPct, explanation, this.getThresholds(context))
     );
   }
 
-  getThresholds(_context?: CriterionContext): CriterionThresholds {
+  getThresholds(context?: CriterionContext): CriterionThresholds {
+    const rawSector = String(
+      (context?.stockData as unknown as Record<string, unknown>)?.["sector"] ??
+        context?.stockData?.sector ??
+        ""
+    );
+    const userSector = SECTOR_MAP[rawSector];
+    const target = userSector ? SECTOR_TARGETS[userSector] : undefined;
     return {
       name: this.name,
-      description: "Sector allocation vs portfolio targets",
+      description: "Sector allocation vs portfolio targets (%)",
       min: 0,
-      max: 0.45,
-      target: 0.35,
+      max: target ? target.max * 100 : 45,
+      target: target ? target.target * 100 : 35,
       unit: "%",
     };
   }

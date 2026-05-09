@@ -110,14 +110,14 @@ function buildPlainSummary(e: CriterionEvaluation): string {
 
     case "payout_ratio":
       if (!passed) {
-        if (actualValue > 1) return "Paying out more than it earns — not sustainable";
-        return `Only ${(actualValue * 100).toFixed(0)}% of profits go to dividends — too low`;
+        if (actualValue > 100) return "Paying out more than it earns — not sustainable";
+        return `Only ${actualValue.toFixed(0)}% of profits go to dividends — too low`;
       }
-      return `${(actualValue * 100).toFixed(0)}% of profits paid as dividends — healthy balance`;
+      return `${actualValue.toFixed(0)}% of profits paid as dividends — healthy balance`;
 
     case "dividend_growth":
       if (!passed) return "Dividends not growing consistently";
-      return `Dividends growing at ${(actualValue * 100).toFixed(1)}% per year — good sign`;
+      return `Dividends growing at ${actualValue.toFixed(1)}% per year — good sign`;
 
     case "debt_to_equity":
       if (!passed) return `High debt compared to company value (${actualValue.toFixed(2)}x) — higher risk`;
@@ -141,11 +141,11 @@ function buildPlainSummary(e: CriterionEvaluation): string {
 
     case "roe":
       if (!passed) return "Company not generating strong returns on shareholder money";
-      return `Good returns on investor money (${(actualValue * 100).toFixed(1)}%)`;
+      return `Good returns on investor money (${actualValue.toFixed(1)}%)`;
 
     case "quality_score":
       if (!passed) return "Overall quality below our threshold";
-      return `Good overall quality score (${(actualValue * 100).toFixed(0)}%)`;
+      return `Good overall quality score (${actualValue.toFixed(0)}%)`;
 
     case "sector_concentration":
       // The explanation from the new criterion is already plain English

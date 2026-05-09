@@ -85,7 +85,7 @@ export class DividendYieldCriterion extends DividendCriterion {
     const recency = this.checkDividendRecency(context);
     if (!recency.isRecent) {
       const msg = recency.lastPaymentDate
-        ? `Last dividend was paid ${recency.monthsAgo} months ago (${recency.lastPaymentDate}) — too long ago. We require a dividend within the last 12 months.`
+        ? `Last dividend was paid ${recency.monthsAgo} months ago (${recency.lastPaymentDate}) — too long ago. We require a dividend within the last 14 months.`
         : "No dividend payment on record. This stock does not qualify as a dividend payer.";
       return Promise.resolve(
         this.createEvaluation(context, false, 0 as Score, 0, msg, this.getThresholds(context))

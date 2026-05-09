@@ -71,7 +71,12 @@ export class TelegramBot {
     process.once("SIGTERM", () => this.stop("SIGTERM"));
 
     process.stdout.write("Yieldsmith bot is running.\n");
-    await this.bot.launch();
+    try {
+      await this.bot.launch();
+    } catch (error) {
+      this.running = false;
+      throw error;
+    }
   }
 
   stop(signal?: string): void {

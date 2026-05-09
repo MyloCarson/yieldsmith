@@ -41,7 +41,7 @@ export class PERatioCriterion extends ValuationCriterion {
       throw new CriterionValidationError(this.name, ["stockData.price"]);
     }
     if (!hasPERatio && !hasEPS) {
-      throw new CriterionValidationError(this.name, ["stockData.peRatio"]);
+      throw new CriterionValidationError(this.name, ["stockData.peRatio or stockData.eps"]);
     }
   }
 
