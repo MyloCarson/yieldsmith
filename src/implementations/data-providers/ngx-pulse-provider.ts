@@ -1,5 +1,5 @@
 import { format, subDays } from "date-fns";
-import { StockSymbol, MarketId, DateOnly } from "@/types/common";
+import { StockSymbol, MarketId } from "@/types/common";
 import {
   IStockDataProvider,
   PriceSnapshot,
@@ -241,7 +241,7 @@ export class DataProviderNGXPulse implements IStockDataProvider {
     return data.map((row) => ({
       symbol,
       marketId: _marketId,
-      date: row.trade_date as unknown as DateOnly,
+      date: row.trade_date,
       open: row.open_price,
       high: row.high_price,
       low: row.low_price,
@@ -265,14 +265,12 @@ export class DataProviderNGXPulse implements IStockDataProvider {
         symbol,
         marketId,
         dividend_per_share: row.dividend_per_share,
-        ex_dividend_date: row.ex_dividend_date as unknown as DateOnly,
-        payment_date: (row.pay_date ?? row.ex_dividend_date) as unknown as DateOnly,
-        announcement_date: row.ex_dividend_date as unknown as DateOnly,
+        ex_dividend_date: row.ex_dividend_date,
+        payment_date: row.pay_date ?? row.ex_dividend_date,
+        announcement_date: row.ex_dividend_date,
         dividend_type: "regular" as const,
       }))
-      .sort((a, b) =>
-        (a.payment_date as unknown as string).localeCompare(b.payment_date as unknown as string)
-      );
+      .sort((a, b) => a.payment_date.localeCompare(b.payment_date));
 
     this.dividendCache.set(cacheKey, history);
     return history;
