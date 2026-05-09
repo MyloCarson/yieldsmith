@@ -73,6 +73,15 @@ export function formatExploreResults(candidates: ExploreCandidate[]): string {
   return lines.join("\n");
 }
 
+export function formatExploreCard(candidate: ExploreCandidate, rank: number): string {
+  const scorePercent = Math.round(candidate.overallScore * 100);
+  const rating = getRating(candidate.overallScore);
+  return (
+    `<b>${rank}. ${escapeHtml(String(candidate.symbol))} — ${escapeHtml(candidate.name)}</b>\n` +
+    `${escapeHtml(candidate.sector)} · ₦${candidate.currentPrice.toLocaleString("en-NG")} · ${rating} (${scorePercent}%)`
+  );
+}
+
 function formatEvaluationLine(evaluation: CriterionEvaluation): string {
   const icon = evaluation.passed ? "✅" : "❌";
   const name = PLAIN_NAMES[evaluation.criterionName] ?? evaluation.criterionDisplayName;

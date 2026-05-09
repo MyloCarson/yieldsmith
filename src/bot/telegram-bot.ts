@@ -14,6 +14,7 @@ import { createRecommendHandler } from "./commands/recommend.command";
 import { StockService } from "./services/stock-service";
 import { PortfolioService } from "./services/portfolio-service";
 import { RecommendationService } from "./services/recommendation-service";
+import { registerCallbacks } from "./callbacks/callback-router";
 
 export class TelegramBot {
   private readonly bot: Telegraf<BotContext>;
@@ -28,6 +29,12 @@ export class TelegramBot {
     this.bot = new Telegraf<BotContext>(config.token);
     this.registerMiddleware(config);
     this.registerCommands();
+    registerCallbacks(
+      this.bot,
+      this.stockService,
+      this.portfolioService,
+      this.recommendationService
+    );
   }
 
   private registerMiddleware(config: BotConfig): void {
@@ -65,6 +72,17 @@ export class TelegramBot {
 
   async launch(): Promise<void> {
     if (this.running) return;
+
+    await this.bot.telegram.setMyCommands([
+      { command: "start", description: "Start the bot" },
+      { command: "help", description: "How Yieldsmith works" },
+      { command: "explore", description: "Explore NGX-listed stocks" },
+      { command: "stock_health", description: "Check a stock's health score" },
+      { command: "recommend", description: "Get stock recommendations" },
+      { command: "portfolio", description: "View your portfolio" },
+      { command: "add_holding", description: "Add a stock to your portfolio" },
+      { command: "remove_holding", description: "Remove a stock from your portfolio" },
+    ]);
 
     this.running = true;
     process.once("SIGINT", () => this.stop("SIGINT"));

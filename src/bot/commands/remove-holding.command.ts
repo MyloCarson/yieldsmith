@@ -1,6 +1,6 @@
 import { BotContext } from "../types";
 import { PortfolioService } from "../services/portfolio-service";
-import { formatRemoveHolding } from "../formatters/portfolio-formatter";
+import { removeConfirmKeyboard } from "../keyboards/portfolio.keyboard";
 import { escapeHtml } from "@/utils/html";
 import { TelegramUserId, StockSymbol, MarketId } from "@/types/common";
 
@@ -30,7 +30,9 @@ export function createRemoveHoldingHandler(portfolioService: PortfolioService) {
       return;
     }
 
-    await portfolioService.removeHolding(userId, symbol, marketId);
-    await ctx.replyWithHTML(formatRemoveHolding(String(symbol)));
+    await ctx.replyWithHTML(
+      `⚠️ Remove <b>${escapeHtml(String(symbol))}</b> from your portfolio?\n\nThis will delete all lots for this holding.`,
+      removeConfirmKeyboard(String(symbol))
+    );
   };
 }
