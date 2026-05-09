@@ -6,10 +6,10 @@ import { RiskCriterion } from "./base-criterion";
 // User's target sector allocations (max before it's considered overweight)
 const SECTOR_TARGETS: Record<string, { target: number; max: number; label: string }> = {
   Banking: { target: 0.375, max: 0.45, label: "Banking" },
-  Industrials: { target: 0.225, max: 0.30, label: "Industrials" },
+  Industrials: { target: 0.225, max: 0.3, label: "Industrials" },
   Consumer: { target: 0.175, max: 0.25, label: "Consumer Goods" },
-  "Oil & Gas": { target: 0.125, max: 0.20, label: "Oil & Gas" },
-  Telecoms: { target: 0.125, max: 0.20, label: "Telecoms" },
+  "Oil & Gas": { target: 0.125, max: 0.2, label: "Oil & Gas" },
+  Telecoms: { target: 0.125, max: 0.2, label: "Telecoms" },
 };
 
 // Maps NGX Pulse sector strings → user's category names
@@ -37,7 +37,10 @@ export class SectorConcentrationCriterion extends RiskCriterion {
   readonly weight: Score = 0.05 as Score;
 
   protected validateRequiredFields(context: CriterionContext): void {
-    if (!context.stockData?.sector && !(context.stockData as unknown as Record<string, unknown>)?.["sector"]) {
+    if (
+      !context.stockData?.sector &&
+      !(context.stockData as unknown as Record<string, unknown>)?.["sector"]
+    ) {
       throw new CriterionValidationError(this.name, ["stockData.sector"]);
     }
   }
@@ -111,12 +114,18 @@ export class SectorConcentrationCriterion extends RiskCriterion {
       passed = true;
       const headroom = target.max - currentAlloc;
       score = this.boundScore(0.7 + headroom * 0.5);
-      explanation =
-        `${target.label} is at ${currentPct.toFixed(1)}% — well within your target of ${targetPct.toFixed(0)}%. Good balance.`;
+      explanation = `${target.label} is at ${currentPct.toFixed(1)}% — well within your target of ${targetPct.toFixed(0)}%. Good balance.`;
     }
 
     return Promise.resolve(
-      this.createEvaluation(context, passed, score, currentPct, explanation, this.getThresholds(context))
+      this.createEvaluation(
+        context,
+        passed,
+        score,
+        currentPct,
+        explanation,
+        this.getThresholds(context)
+      )
     );
   }
 

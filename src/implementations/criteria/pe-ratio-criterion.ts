@@ -33,7 +33,8 @@ export class PERatioCriterion extends ValuationCriterion {
   readonly weight: Score = 0.15 as Score;
 
   protected validateRequiredFields(context: CriterionContext): void {
-    const hasPERatio = (context.stockData as unknown as Record<string, unknown>)?.["peRatio"] != null;
+    const hasPERatio =
+      (context.stockData as unknown as Record<string, unknown>)?.["peRatio"] != null;
     const hasEPS = context.stockData?.eps != null && context.stockData.eps > 0;
     const hasPrice = context.stockData?.price != null;
 
@@ -80,12 +81,21 @@ export class PERatioCriterion extends ValuationCriterion {
     const explanation = this.buildExplanation(peRatio, benchmark, passed);
 
     return Promise.resolve(
-      this.createEvaluation(context, passed, score, peRatio, explanation, this.getThresholds(context))
+      this.createEvaluation(
+        context,
+        passed,
+        score,
+        peRatio,
+        explanation,
+        this.getThresholds(context)
+      )
     );
   }
 
   getThresholds(context?: CriterionContext): CriterionThresholds {
-    const sector = String((context?.stockData as unknown as Record<string, unknown>)?.["sector"] ?? "");
+    const sector = String(
+      (context?.stockData as unknown as Record<string, unknown>)?.["sector"] ?? ""
+    );
     const b = SECTOR_PE[sector] ?? DEFAULT_PE;
     return {
       name: this.name,
@@ -109,10 +119,7 @@ export class PERatioCriterion extends ValuationCriterion {
     return Promise.resolve(true);
   }
 
-  private calcScore(
-    pe: number,
-    b: { min: number; target: number; max: number }
-  ): Score {
+  private calcScore(pe: number, b: { min: number; target: number; max: number }): Score {
     if (pe < b.min) {
       // Too cheap — penalise but not harshly (might be a real bargain)
       const depth = b.min - pe;

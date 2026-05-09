@@ -29,7 +29,8 @@ export function formatRecommendation(result: RecommendationResult): string {
   ];
 
   if (recommendation.targetPrice) {
-    const upside = ((recommendation.targetPrice - evaluation.currentPrice) / evaluation.currentPrice) * 100;
+    const upside =
+      ((recommendation.targetPrice - evaluation.currentPrice) / evaluation.currentPrice) * 100;
     const direction = upside >= 0 ? "📈" : "📉";
     lines.push(
       `Fair value estimate: ₦${recommendation.targetPrice.toLocaleString("en-NG")} ${direction} (${upside >= 0 ? "+" : ""}${upside.toFixed(1)}% from now)`
@@ -76,7 +77,9 @@ export function formatRecommendation(result: RecommendationResult): string {
 
   if (recommendation.investmentHorizon) {
     lines.push(``);
-    lines.push(`<i>Best held for: ${escapeHtml(formatHorizon(recommendation.investmentHorizon))}</i>`);
+    lines.push(
+      `<i>Best held for: ${escapeHtml(formatHorizon(recommendation.investmentHorizon))}</i>`
+    );
   }
 
   return lines.join("\n");

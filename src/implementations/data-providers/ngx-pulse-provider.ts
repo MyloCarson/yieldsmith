@@ -270,7 +270,9 @@ export class DataProviderNGXPulse implements IStockDataProvider {
         announcement_date: row.ex_dividend_date as unknown as DateOnly,
         dividend_type: "regular" as const,
       }))
-      .sort((a, b) => (a.payment_date as unknown as string).localeCompare(b.payment_date as unknown as string));
+      .sort((a, b) =>
+        (a.payment_date as unknown as string).localeCompare(b.payment_date as unknown as string)
+      );
 
     this.dividendCache.set(cacheKey, history);
     return history;
@@ -335,7 +337,9 @@ export class DataProviderNGXPulse implements IStockDataProvider {
         if (Array.isArray(value)) return value as T[];
       }
     }
-    process.stderr.write(`[WARN] NGX Pulse: unexpected non-array response from ${path}: ${JSON.stringify(raw).slice(0, 200)}\n`);
+    process.stderr.write(
+      `[WARN] NGX Pulse: unexpected non-array response from ${path}: ${JSON.stringify(raw).slice(0, 200)}\n`
+    );
     return [];
   }
 

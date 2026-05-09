@@ -120,7 +120,8 @@ function buildPlainSummary(e: CriterionEvaluation): string {
       return `Dividends growing at ${actualValue.toFixed(1)}% per year — good sign`;
 
     case "debt_to_equity":
-      if (!passed) return `High debt compared to company value (${actualValue.toFixed(2)}x) — higher risk`;
+      if (!passed)
+        return `High debt compared to company value (${actualValue.toFixed(2)}x) — higher risk`;
       return `Low debt (${actualValue.toFixed(2)}x) — company is financially stable`;
 
     case "book_value":
