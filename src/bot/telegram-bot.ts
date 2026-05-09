@@ -66,12 +66,17 @@ export class TelegramBot {
   async launch(): Promise<void> {
     if (this.running) return;
 
-    await this.bot.launch();
     this.running = true;
-    process.stdout.write("Yieldsmith bot is running.\n");
-
     process.once("SIGINT", () => this.stop("SIGINT"));
     process.once("SIGTERM", () => this.stop("SIGTERM"));
+
+    process.stdout.write("Yieldsmith bot is running.\n");
+    try {
+      await this.bot.launch();
+    } catch (error) {
+      this.running = false;
+      throw error;
+    }
   }
 
   stop(signal?: string): void {

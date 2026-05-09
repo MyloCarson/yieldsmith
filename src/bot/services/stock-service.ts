@@ -46,12 +46,16 @@ export class StockService {
   }
 
   async evaluateStock(symbol: StockSymbol, marketId: MarketId): Promise<StockEvaluation> {
-    const [priceSnapshot, financials, dividendHistory, historicalPrices] = await Promise.all([
-      this.provider.getCurrentPrice(symbol, marketId),
-      this.provider.getFinancials(symbol, marketId),
-      this.provider.getDividendHistory(symbol, marketId),
-      this.provider.getHistoricalPrices(symbol, marketId, 252),
-    ]);
+    const [priceSnapshot, financials, dividendHistory, historicalPrices, searchResults] =
+      await Promise.all([
+        this.provider.getCurrentPrice(symbol, marketId),
+        this.provider.getFinancials(symbol, marketId),
+        this.provider.getDividendHistory(symbol, marketId),
+        this.provider.getHistoricalPrices(symbol, marketId, 252),
+        this.provider.searchStocks(String(symbol), 5),
+      ]);
+
+    const sector = searchResults.find((r) => r.symbol === symbol)?.sector;
 
     const context = buildCriterionContext(
       symbol,
@@ -59,7 +63,8 @@ export class StockService {
       priceSnapshot.currentPrice,
       financials,
       dividendHistory,
-      historicalPrices
+      historicalPrices,
+      sector
     );
 
     const criterionNames = await this.criterionFactory.getAllAvailable();
@@ -183,7 +188,8 @@ function buildCriterionContext(
   currentPrice: number,
   financials: Awaited<ReturnType<IStockDataProvider["getFinancials"]>>,
   dividendHistory: Awaited<ReturnType<IStockDataProvider["getDividendHistory"]>>,
-  historicalPrices: Awaited<ReturnType<IStockDataProvider["getHistoricalPrices"]>>
+  historicalPrices: Awaited<ReturnType<IStockDataProvider["getHistoricalPrices"]>>,
+  sector?: string
 ): CriterionContext {
   const latestDividend = dividendHistory.at(-1);
   const dividendYield = latestDividend
@@ -194,11 +200,28 @@ function buildCriterionContext(
   const averageDailyVolume = calcAvgDailyVolume(historicalPrices);
 
   // Extra fields accessed via `as unknown` casts in specific criteria that extend CriterionStockData
-  const extraStockFields: Record<string, number> = {};
+  const extraStockFields: Record<string, number | string> = {};
   if (annualizedVolatility != null) extraStockFields["volatility"] = annualizedVolatility;
   if (averageDailyVolume != null) extraStockFields["averageDailyVolume"] = averageDailyVolume;
   if (financials?.debt != null) extraStockFields["debt"] = financials.debt;
   if (financials?.equity != null) extraStockFields["equity"] = financials.equity;
+  if (sector != null) extraStockFields["sector"] = sector;
+
+  // dividendPerShare from latest dividend record
+  if (latestDividend != null) {
+    extraStockFields["dividendPerShare"] = latestDividend.dividend_per_share;
+  }
+
+  // totalDividendsPaid approximated as dps × shares_outstanding (net_income / eps)
+  if (
+    latestDividend != null &&
+    financials?.net_income != null &&
+    financials.eps != null &&
+    financials.eps > 0
+  ) {
+    const sharesOutstanding = financials.net_income / financials.eps;
+    extraStockFields["totalDividendsPaid"] = latestDividend.dividend_per_share * sharesOutstanding;
+  }
 
   return {
     symbol,

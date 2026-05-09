@@ -1,99 +1,55 @@
-/**
- * NGX Pulse Data Provider
- * Integrates with ngxpulse.ng API for real-time NGX market data
- *
- * Provides:
- * - Real-time prices and quote data
- * - Historical price data
- * - Dividend information and history
- * - Company financials
- * - Advanced search and filtering
- */
-
-import { format, subDays, subMonths } from "date-fns";
-import { StockSymbol, MarketId, DateOnly } from "@/types/common";
+import { format, subDays } from "date-fns";
+import { StockSymbol, MarketId } from "@/types/common";
+import {
+  IStockDataProvider,
+  PriceSnapshot,
+  HistoricalPrice,
+  DividendData,
+  FinancialData,
+  StockSearchResult,
+} from "@core/data-provider";
 import { RateLimitError, ConfigurationError } from "@core/errors";
 
-// Local type definitions for provider data contracts
-export interface PriceSnapshot {
-  symbol: StockSymbol;
-  marketId: MarketId;
-  currentPrice: number;
-  previousClose: number;
-  change: number;
-  changePercent: number;
-  timestamp: Date;
-  source: string;
-}
+// ── NGX Pulse API response shapes ────────────────────────────────────────────
 
-export interface HistoricalPrice {
-  symbol: StockSymbol;
-  marketId: MarketId;
-  date: DateOnly;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  adjustedClose: number;
-}
-
-export interface DividendData {
-  symbol: StockSymbol;
-  marketId: MarketId;
-  dividend_per_share: number;
-  ex_dividend_date: DateOnly;
-  payment_date: DateOnly;
-  announcement_date: DateOnly;
-  dividend_type: string;
-}
-
-export interface FinancialData {
-  symbol: StockSymbol;
-  marketId: MarketId;
-  period: string;
-  date: DateOnly;
-  revenue: number;
-  net_income: number;
-  eps: number;
-  book_value: number;
-  debt: number;
-  equity: number;
-  cash_flow: number;
-}
-
-export interface StockSearchResult {
-  symbol: StockSymbol;
+interface NGXStockResponse {
+  symbol: string;
   name: string;
-  marketId: MarketId;
+  current_price: number;
+  change_percent: number;
+  volume: number;
+  shares_outstanding: number;
   sector: string;
-  lastPrice: number;
-  timestamp: Date;
+  pe_ratio: number;
 }
 
-export interface HealthCheckResult {
-  healthy: boolean;
+interface NGXPriceResponse {
+  trade_date: string;
+  open_price: number;
+  high_price: number;
+  low_price: number;
+  close_price: number;
+  volume: number;
+}
+
+interface NGXDividendResponse {
+  symbol: string;
+  company_name: string;
+  ex_dividend_date: string;
+  record_date: string;
+  pay_date: string;
+  dividend_per_share: number;
+  currency: string;
+}
+
+interface NGXMarketStatusResponse {
   status: string;
-  lastCheck: Date;
-  responseTime: number;
-  error?: string;
+  message: string;
+  timestamp: string;
 }
 
-export interface ProviderCapabilities {
-  supportsHistoricalData: boolean;
-  supportsDividendData: boolean;
-  supportsFinancialData: boolean;
-  supportsNewsData: boolean;
-  supportsEarningsData: boolean;
-  maxHistoricalDays: number;
-  maxSearchResults: number;
-  rateLimitType: string;
-  cacheSupported: boolean;
-}
+// ── Config ────────────────────────────────────────────────────────────────────
 
-/**
- * NGX Pulse provider configuration
- */
 export interface NGXPulseConfig {
   apiKey?: string;
   baseUrl?: string;
@@ -101,7 +57,7 @@ export interface NGXPulseConfig {
   cacheTTL?: {
     prices: number;
     dividends: number;
-    financials: number;
+    stocks: number;
   };
   rateLimit?: {
     requestsPerMinute: number;
@@ -109,490 +65,313 @@ export interface NGXPulseConfig {
   };
 }
 
-/**
- * Simple in-memory price cache
- */
-class SimplePriceCache {
-  private cache: Map<string, { price: PriceSnapshot; expireAt: number }> = new Map();
-  private ttl: number;
+// ── Simple in-memory caches ───────────────────────────────────────────────────
 
-  constructor(ttlSeconds: number = 60) {
-    this.ttl = ttlSeconds * 1000;
+class SimpleCache<T> {
+  private cache: Map<string, { data: T; expireAt: number }> = new Map();
+  private ttlMs: number;
+
+  constructor(ttlSeconds: number) {
+    this.ttlMs = ttlSeconds * 1000;
   }
 
-  get(symbol: StockSymbol, marketId: MarketId): PriceSnapshot | null {
-    const key = `${symbol}-${marketId}`;
-    const cached = this.cache.get(key);
-
-    if (!cached) return null;
-    if (Date.now() > cached.expireAt) {
+  get(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expireAt) {
       this.cache.delete(key);
       return null;
     }
-
-    return cached.price;
+    return entry.data;
   }
 
-  set(symbol: StockSymbol, marketId: MarketId, price: PriceSnapshot): void {
-    const key = `${symbol}-${marketId}`;
-    this.cache.set(key, {
-      price,
-      expireAt: Date.now() + this.ttl,
-    });
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-
-  size(): number {
-    return this.cache.size;
+  set(key: string, data: T): void {
+    this.cache.set(key, { data, expireAt: Date.now() + this.ttlMs });
   }
 }
 
-/**
- * Rate limiter using sliding window
- */
-class RateLimiter {
-  private requestTimestamps: number[] = [];
-  private requestsPerMinute: number;
-  private requestsPerHour: number;
+// ── Rate limiter ──────────────────────────────────────────────────────────────
 
-  constructor(requestsPerMinute: number = 60, requestsPerHour: number = 1000) {
-    this.requestsPerMinute = requestsPerMinute;
-    this.requestsPerHour = requestsPerHour;
-  }
+class RateLimiter {
+  private timestamps: number[] = [];
+
+  constructor(
+    private readonly perMinute: number,
+    private readonly perHour: number
+  ) {}
 
   checkLimit(): Promise<void> {
     const now = Date.now();
-    const oneMinuteAgo = now - 60 * 1000;
-    const oneHourAgo = now - 60 * 60 * 1000;
+    const oneMinuteAgo = now - 60_000;
+    const oneHourAgo = now - 3_600_000;
 
-    // Remove old timestamps
-    this.requestTimestamps = this.requestTimestamps.filter((t) => t > oneHourAgo);
+    this.timestamps = this.timestamps.filter((t) => t > oneHourAgo);
 
-    // Check per-minute limit
-    const recentMinute = this.requestTimestamps.filter((t) => t > oneMinuteAgo).length;
-    if (recentMinute >= this.requestsPerMinute) {
-      const oldestRecentRequest = this.requestTimestamps.filter((t) => t > oneMinuteAgo)[0];
-      const resetAt = (oldestRecentRequest ?? now) + 60 * 1000;
-      return Promise.reject(new RateLimitError(resetAt - now));
+    const recentMinute = this.timestamps.filter((t) => t > oneMinuteAgo).length;
+    if (recentMinute >= this.perMinute) {
+      const oldest = this.timestamps.filter((t) => t > oneMinuteAgo)[0] ?? now;
+      return Promise.reject(new RateLimitError(oldest + 60_000));
     }
 
-    // Check per-hour limit
-    if (this.requestTimestamps.length >= this.requestsPerHour) {
-      const oldestRequest = this.requestTimestamps[0];
-      const resetAt = (oldestRequest ?? now) + 60 * 60 * 1000;
-      return Promise.reject(new RateLimitError(resetAt - now));
+    if (this.timestamps.length >= this.perHour) {
+      const oldest = this.timestamps[0] ?? now;
+      return Promise.reject(new RateLimitError(oldest + 3_600_000));
     }
 
-    // Record this request
-    this.requestTimestamps.push(now);
+    this.timestamps.push(now);
     return Promise.resolve();
   }
 
-  getRemainingRequests(): { minute: number; hour: number } {
+  getRemaining(): { minute: number; hour: number } {
     const now = Date.now();
-    const oneMinuteAgo = now - 60 * 1000;
-
-    const recentMinute = this.requestTimestamps.filter((t) => t > oneMinuteAgo).length;
-
+    const recentMinute = this.timestamps.filter((t) => t > now - 60_000).length;
     return {
-      minute: Math.max(0, this.requestsPerMinute - recentMinute),
-      hour: Math.max(0, this.requestsPerHour - this.requestTimestamps.length),
+      minute: Math.max(0, this.perMinute - recentMinute),
+      hour: Math.max(0, this.perHour - this.timestamps.length),
     };
   }
 }
 
-/**
- * NGX Pulse Data Provider Implementation
- */
-export class DataProviderNGXPulse {
+// ── Provider ──────────────────────────────────────────────────────────────────
+
+export class DataProviderNGXPulse implements IStockDataProvider {
   readonly id = "ngx_pulse";
   readonly name = "NGX Pulse";
 
-  private config: Required<NGXPulseConfig> = {
-    apiKey: "",
-    baseUrl: "https://api.ngxpulse.ng/v1",
-    timeout: 10000,
-    cacheTTL: {
-      prices: 60,
-      dividends: 3600,
-      financials: 86400,
-    },
-    rateLimit: {
-      requestsPerMinute: 60,
-      requestsPerHour: 1000,
-    },
-  };
-
-  private priceCache: SimplePriceCache;
-  private dividendCache: Map<string, { data: DividendData; expireAt: number }> = new Map();
-  private financialCache: Map<string, { data: FinancialData; expireAt: number }> = new Map();
-  private rateLimiter: RateLimiter;
+  private readonly config: Required<NGXPulseConfig>;
+  private readonly priceCache: SimpleCache<PriceSnapshot>;
+  private readonly dividendCache: SimpleCache<DividendData[]>;
+  private readonly stocksCache: SimpleCache<NGXStockResponse[]>;
+  private readonly rateLimiter: RateLimiter;
   private initialized = false;
-  private lastHealthCheck: HealthCheckResult | null = null;
 
   constructor(config?: Partial<NGXPulseConfig>) {
-    if (config) {
-      this.config = { ...this.config, ...config };
-    }
-    this.priceCache = new SimplePriceCache(this.config.cacheTTL.prices);
+    this.config = {
+      apiKey: config?.apiKey ?? "",
+      baseUrl: config?.baseUrl ?? "https://www.ngxpulse.ng",
+      timeout: config?.timeout ?? 10_000,
+      cacheTTL: {
+        prices: config?.cacheTTL?.prices ?? 60,
+        dividends: config?.cacheTTL?.dividends ?? 3600,
+        stocks: config?.cacheTTL?.stocks ?? 60,
+      },
+      rateLimit: {
+        requestsPerMinute: config?.rateLimit?.requestsPerMinute ?? 60,
+        requestsPerHour: config?.rateLimit?.requestsPerHour ?? 1000,
+      },
+    };
+    this.priceCache = new SimpleCache(this.config.cacheTTL.prices);
+    this.dividendCache = new SimpleCache(this.config.cacheTTL.dividends);
+    this.stocksCache = new SimpleCache(this.config.cacheTTL.stocks);
     this.rateLimiter = new RateLimiter(
       this.config.rateLimit.requestsPerMinute,
       this.config.rateLimit.requestsPerHour
     );
   }
 
-  /**
-   * Check if provider is configured
-   */
   isConfigured(): boolean {
-    return this.config.baseUrl.length > 0 && this.config.apiKey.length > 0;
+    return this.config.apiKey.length > 0 && this.config.baseUrl.length > 0;
   }
 
-  /**
-   * Get current price for a stock
-   */
-  async getCurrentPrice(symbol: StockSymbol, marketId: MarketId): Promise<PriceSnapshot> {
-    // Check cache first
-    const cached = this.priceCache.get(symbol, marketId);
-    if (cached) {
-      return cached;
-    }
-
-    // Check rate limit
-    await this.rateLimiter.checkLimit();
-
-    // Simulate API call (would be real HTTP in production)
-    const mockPrice = this.getMockPrice(symbol);
-
-    const snapshot: PriceSnapshot = {
-      symbol,
-      marketId,
-      currentPrice: mockPrice.current,
-      previousClose: mockPrice.previous,
-      change: mockPrice.current - mockPrice.previous,
-      changePercent: ((mockPrice.current - mockPrice.previous) / mockPrice.previous) * 100,
-      timestamp: new Date(),
-      source: "ngx_pulse",
-    };
-
-    // Cache the result
-    this.priceCache.set(symbol, marketId, snapshot);
-
-    return snapshot;
-  }
-
-  /**
-   * Get historical prices for a stock
-   */
-  async getHistoricalPrices(
-    symbol: StockSymbol,
-    marketId: MarketId,
-    days: number
-  ): Promise<HistoricalPrice[]> {
-    await this.rateLimiter.checkLimit();
-
-    // Generate mock historical data
-    const prices: HistoricalPrice[] = [];
-    const basePrice = this.getMockPrice(symbol).current;
-
-    for (let i = days - 1; i >= 0; i--) {
-      const date = subDays(new Date(), i);
-
-      const variation = (Math.random() - 0.5) * 0.05; // ±2.5% variation
-      const close = basePrice * (1 + variation);
-
-      prices.push({
-        symbol,
-        marketId,
-        date: this.formatDate(date),
-        open: close * 0.99,
-        high: close * 1.02,
-        low: close * 0.98,
-        close,
-        volume: Math.floor(Math.random() * 10000000) + 1000000,
-        adjustedClose: close,
-      });
-    }
-
-    return prices;
-  }
-
-  /**
-   * Get latest dividend information
-   */
-  async getLatestDividend(symbol: StockSymbol, marketId: MarketId): Promise<DividendData | null> {
-    const cacheKey = `${symbol}-${marketId}`;
-
-    // Check cache
-    const cached = this.dividendCache.get(cacheKey);
-    if (cached && Date.now() < cached.expireAt) {
-      return cached.data;
-    }
-
-    await this.rateLimiter.checkLimit();
-
-    // Generate mock dividend data
-    const dividend: DividendData = {
-      symbol,
-      marketId,
-      dividend_per_share: Math.random() * 100 + 10, // ₦10-110 per share
-      ex_dividend_date: this.formatDate(subDays(new Date(), 30)),
-      payment_date: this.formatDate(new Date()),
-      announcement_date: this.formatDate(subDays(new Date(), 60)),
-      dividend_type: "regular",
-    };
-
-    // Cache result
-    this.dividendCache.set(cacheKey, {
-      data: dividend,
-      expireAt: Date.now() + this.config.cacheTTL.dividends * 1000,
-    });
-
-    return dividend;
-  }
-
-  /**
-   * Get dividend history for a stock
-   */
-  async getDividendHistory(symbol: StockSymbol, marketId: MarketId): Promise<DividendData[]> {
-    await this.rateLimiter.checkLimit();
-
-    // Generate mock dividend history (last 4 quarters), oldest-first
-    const history: DividendData[] = [];
-
-    for (let i = 3; i >= 0; i--) {
-      const baseDate = subMonths(new Date(), i * 3);
-
-      const dividend: DividendData = {
-        symbol,
-        marketId,
-        dividend_per_share: (Math.random() * 50 + 20) * (1 + (3 - i) * 0.05), // Slightly growing
-        ex_dividend_date: this.formatDate(subDays(baseDate, 10)),
-        payment_date: this.formatDate(baseDate),
-        announcement_date: this.formatDate(subDays(baseDate, 30)),
-        dividend_type: "regular",
-      };
-
-      history.push(dividend);
-    }
-
-    return history;
-  }
-
-  /**
-   * Get financial data for a stock
-   */
-  async getFinancials(
-    symbol: StockSymbol,
-    marketId: MarketId,
-    period?: string
-  ): Promise<FinancialData | null> {
-    const cacheKey = `${symbol}-${marketId}-${period ?? "latest"}`;
-
-    // Check cache
-    const cached = this.financialCache.get(cacheKey);
-    if (cached && Date.now() < cached.expireAt) {
-      return cached.data;
-    }
-
-    await this.rateLimiter.checkLimit();
-
-    // Generate mock financial data
-    const financials: FinancialData = {
-      symbol,
-      marketId,
-      period: period ?? "Q4-2025",
-      date: this.formatDate(new Date()),
-      revenue: Math.random() * 100000000 + 10000000, // ₦10B-110B
-      net_income: Math.random() * 10000000 + 1000000,
-      eps: Math.random() * 500 + 50,
-      book_value: Math.random() * 1000 + 100,
-      debt: Math.random() * 50000000 + 5000000,
-      equity: Math.random() * 100000000 + 20000000,
-      cash_flow: Math.random() * 15000000 + 2000000,
-    };
-
-    // Cache result
-    this.financialCache.set(cacheKey, {
-      data: financials,
-      expireAt: Date.now() + this.config.cacheTTL.financials * 1000,
-    });
-
-    return financials;
-  }
-
-  /**
-   * Search for stocks
-   */
-  async searchStocks(query: string, limit?: number): Promise<StockSearchResult[]> {
-    await this.rateLimiter.checkLimit();
-
-    // Mock search results
-    const mockSymbols = ["MTNN", "BUA", "ETI", "UBA", "GTCO", "FBNH"];
-    const results: StockSearchResult[] = mockSymbols
-      .filter((s) => s.includes(query.toUpperCase()) || query === "")
-      .slice(0, limit ?? 10)
-      .map((symbol) => ({
-        symbol: symbol as StockSymbol,
-        name: `${symbol} Company`,
-        marketId: "ngx" as MarketId,
-        sector: "Diversified",
-        lastPrice: this.getMockPrice(symbol as StockSymbol).current,
-        timestamp: new Date(),
-      }));
-
-    return results;
-  }
-
-  /**
-   * Validate if a symbol is valid for this market
-   */
-  async validateSymbol(symbol: StockSymbol): Promise<boolean> {
-    await this.rateLimiter.checkLimit();
-    // Mock validation: 3-4 letter symbols are valid
-    return /^[A-Z]{3,4}$/.test(String(symbol));
-  }
-
-  /**
-   * Get rate limit information
-   */
-  getRateLimitInfo(): Promise<{
-    requestsRemaining: number;
-    requestsTotal: number;
-    resetAt: Date;
-    percentage: number;
-  }> {
-    const remaining = this.rateLimiter.getRemainingRequests();
-
-    return Promise.resolve({
-      requestsRemaining: Math.min(remaining.minute, remaining.hour),
-      requestsTotal: this.config.rateLimit.requestsPerMinute,
-      resetAt: new Date(Date.now() + 60 * 1000),
-      percentage: (remaining.minute / this.config.rateLimit.requestsPerMinute) * 100,
-    });
-  }
-
-  /**
-   * Check if currently rate limited
-   */
-  async isRateLimited(): Promise<boolean> {
-    const info = await this.getRateLimitInfo();
-    return info.requestsRemaining <= 0;
-  }
-
-  /**
-   * Initialize provider
-   */
   async initialize(): Promise<void> {
     if (this.initialized) return;
-
-    // Validate configuration
     if (!this.isConfigured()) {
-      throw new ConfigurationError("NGXPulse", "Provider not configured (missing API key)");
+      throw new ConfigurationError("NGXPulse", "Missing API key");
     }
-
-    // Test connection
     await this.healthCheck();
     this.initialized = true;
   }
 
-  /**
-   * Health check
-   */
-  async healthCheck(): Promise<HealthCheckResult> {
-    const startTime = Date.now();
-
+  async healthCheck(): Promise<{ healthy: boolean; status: string }> {
     try {
-      // Simulate API health check
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      this.lastHealthCheck = {
-        healthy: true,
-        status: "operational",
-        lastCheck: new Date(),
-        responseTime: Date.now() - startTime,
-      };
-
-      return this.lastHealthCheck;
+      const data = await this.get<NGXMarketStatusResponse>("/api/ngxdata/market-status");
+      return { healthy: true, status: data.status };
     } catch (error) {
-      const result: HealthCheckResult = {
+      return {
         healthy: false,
-        status: "degraded",
-        lastCheck: new Date(),
-        responseTime: Date.now() - startTime,
-        error: error instanceof Error ? error.message : "Unknown error",
+        status: error instanceof Error ? error.message : "unknown error",
       };
-
-      this.lastHealthCheck = result;
-      return result;
     }
   }
 
-  /**
-   * Get provider capabilities
-   */
-  getCapabilities(): ProviderCapabilities {
-    return {
-      supportsHistoricalData: true,
-      supportsDividendData: true,
-      supportsFinancialData: true,
-      supportsNewsData: false,
-      supportsEarningsData: false,
-      maxHistoricalDays: 365,
-      maxSearchResults: 100,
-      rateLimitType: "requests_per_minute",
-      cacheSupported: true,
+  async getCurrentPrice(symbol: StockSymbol, marketId: MarketId): Promise<PriceSnapshot> {
+    const cached = this.priceCache.get(`${symbol}-${marketId}`);
+    if (cached) return cached;
+
+    const stocks = await this.fetchStocks();
+    const stock = stocks.find((s) => s.symbol.toUpperCase() === String(symbol).toUpperCase());
+
+    if (!stock) {
+      throw new Error(`Symbol "${symbol}" not found in NGX Pulse`);
+    }
+
+    const currentPrice = stock.current_price;
+    const changePercent = stock.change_percent;
+    const previousClose =
+      changePercent !== 0 ? currentPrice / (1 + changePercent / 100) : currentPrice;
+
+    const snapshot: PriceSnapshot = {
+      symbol,
+      marketId,
+      currentPrice,
+      previousClose,
+      change: currentPrice - previousClose,
+      changePercent,
+      timestamp: new Date(),
+      source: "ngx_pulse",
     };
+
+    this.priceCache.set(`${symbol}-${marketId}`, snapshot);
+    return snapshot;
   }
 
-  /**
-   * Get data freshness
-   */
-  getDataFreshness(
+  async getHistoricalPrices(
     symbol: StockSymbol,
-    marketId: MarketId
-  ): Promise<{
-    priceAge: number;
-    dividendAge: number;
-    financialAge: number;
-  }> {
-    return Promise.resolve({
-      priceAge: this.priceCache.get(symbol, marketId) ? 0 : -1,
-      dividendAge: this.config.cacheTTL.dividends * 1000,
-      financialAge: this.config.cacheTTL.financials * 1000,
-    });
+    _marketId: MarketId,
+    days: number
+  ): Promise<HistoricalPrice[]> {
+    const today = new Date();
+    const from = format(subDays(today, days), "yyyy-MM-dd");
+    const to = format(today, "yyyy-MM-dd");
+
+    const data = await this.getArray<NGXPriceResponse>(
+      `/api/ngxdata/prices/${encodeURIComponent(String(symbol))}?from=${from}&to=${to}`
+    );
+
+    return data.map((row) => ({
+      symbol,
+      marketId: _marketId,
+      date: row.trade_date,
+      open: row.open_price,
+      high: row.high_price,
+      low: row.low_price,
+      close: row.close_price,
+      volume: row.volume,
+      adjustedClose: row.close_price,
+    }));
   }
 
-  // ============== Private Helpers ==============
+  async getDividendHistory(symbol: StockSymbol, marketId: MarketId): Promise<DividendData[]> {
+    const cacheKey = `${symbol}-${marketId}`;
+    const cached = this.dividendCache.get(cacheKey);
+    if (cached) return cached;
 
-  /**
-   * Get mock price for a symbol (seeded by symbol name)
-   */
-  private getMockPrice(symbol: StockSymbol): { current: number; previous: number } {
-    // Use symbol as seed for consistent mock prices
-    const seed = String(symbol).charCodeAt(0);
-    const basePrice = ((seed * 137) % 1000) + 100; // 100-1100
+    const data = await this.getArray<NGXDividendResponse>(
+      `/api/ngxdata/dividends/${encodeURIComponent(String(symbol))}?limit=all`
+    );
 
-    return {
-      current: basePrice * (1 + (Math.random() - 0.5) * 0.02),
-      previous: basePrice,
-    };
+    const history: DividendData[] = data
+      .map((row) => ({
+        symbol,
+        marketId,
+        dividend_per_share: row.dividend_per_share,
+        ex_dividend_date: row.ex_dividend_date,
+        payment_date: row.pay_date ?? row.ex_dividend_date,
+        announcement_date: row.ex_dividend_date,
+        dividend_type: "regular" as const,
+      }))
+      .sort((a, b) => a.payment_date.localeCompare(b.payment_date));
+
+    this.dividendCache.set(cacheKey, history);
+    return history;
   }
 
-  /**
-   * Format date as YYYY-MM-DD
-   */
-  private formatDate(date: Date): string {
-    return format(date, "yyyy-MM-dd");
+  async getLatestDividend(symbol: StockSymbol, marketId: MarketId): Promise<DividendData | null> {
+    const history = await this.getDividendHistory(symbol, marketId);
+    return history.at(-1) ?? null;
+  }
+
+  // NGX Pulse has no financials endpoint — return null so criteria handle missing data gracefully
+  getFinancials(_symbol: StockSymbol, _marketId: MarketId): Promise<FinancialData | null> {
+    return Promise.resolve(null);
+  }
+
+  async searchStocks(query: string, limit?: number): Promise<StockSearchResult[]> {
+    const stocks = await this.fetchStocks();
+    const upperQuery = query.toUpperCase();
+
+    const matches =
+      query === ""
+        ? stocks
+        : stocks.filter(
+            (s) =>
+              s.symbol.toUpperCase().includes(upperQuery) ||
+              s.name.toUpperCase().includes(upperQuery)
+          );
+
+    return matches.slice(0, limit ?? 50).map((s) => ({
+      symbol: s.symbol as StockSymbol,
+      name: s.name,
+      marketId: "ngx" as MarketId,
+      sector: s.sector ?? "Unknown",
+      lastPrice: s.current_price,
+      timestamp: new Date(),
+    }));
+  }
+
+  async validateSymbol(symbol: StockSymbol): Promise<boolean> {
+    const stocks = await this.fetchStocks();
+    return stocks.some((s) => s.symbol.toUpperCase() === String(symbol).toUpperCase());
+  }
+
+  // ── Private helpers ─────────────────────────────────────────────────────────
+
+  private async fetchStocks(): Promise<NGXStockResponse[]> {
+    const cached = this.stocksCache.get("all");
+    if (cached) return cached;
+
+    const data = await this.getArray<NGXStockResponse>("/api/ngxdata/stocks");
+    this.stocksCache.set("all", data);
+    return data;
+  }
+
+  private async getArray<T>(path: string): Promise<T[]> {
+    const raw = await this.get<unknown>(path);
+    if (Array.isArray(raw)) return raw as T[];
+    // Handle { data: [...] } or { stocks: [...] } envelope shapes
+    if (raw && typeof raw === "object") {
+      for (const value of Object.values(raw as Record<string, unknown>)) {
+        if (Array.isArray(value)) return value as T[];
+      }
+    }
+    process.stderr.write(
+      `[WARN] NGX Pulse: unexpected non-array response from ${path}: ${JSON.stringify(raw).slice(0, 200)}\n`
+    );
+    return [];
+  }
+
+  private async get<T>(path: string): Promise<T> {
+    await this.rateLimiter.checkLimit();
+
+    const url = `${this.config.baseUrl}${path}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "X-API-Key": this.config.apiKey,
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+      });
+
+      if (response.status === 429) {
+        const retryAfterSecs = Number(response.headers.get("Retry-After") ?? 60);
+        throw new RateLimitError(Date.now() + retryAfterSecs * 1000);
+      }
+
+      if (!response.ok) {
+        throw new Error(`NGX Pulse API ${response.status}: ${response.statusText} — ${path}`);
+      }
+
+      return (await response.json()) as T;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
-/**
- * Export provider and factory function
- */
 export function createNGXPulseProvider(config?: Partial<NGXPulseConfig>): DataProviderNGXPulse {
   return new DataProviderNGXPulse(config);
 }
