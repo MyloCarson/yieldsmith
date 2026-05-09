@@ -1,5 +1,5 @@
 import { format, subDays } from "date-fns";
-import { StockSymbol, MarketId, DateOnly } from "@/types/common";
+import { StockSymbol, MarketId } from "@/types/common";
 import {
   IStockDataProvider,
   PriceSnapshot,
@@ -241,7 +241,7 @@ export class DataProviderNGXPulse implements IStockDataProvider {
     return data.map((row) => ({
       symbol,
       marketId: _marketId,
-      date: row.trade_date as DateOnly,
+      date: row.trade_date,
       open: row.open_price,
       high: row.high_price,
       low: row.low_price,
@@ -265,9 +265,9 @@ export class DataProviderNGXPulse implements IStockDataProvider {
         symbol,
         marketId,
         dividend_per_share: row.dividend_per_share,
-        ex_dividend_date: row.ex_dividend_date as DateOnly,
-        payment_date: (row.pay_date ?? row.ex_dividend_date) as DateOnly,
-        announcement_date: row.ex_dividend_date as DateOnly,
+        ex_dividend_date: row.ex_dividend_date,
+        payment_date: row.pay_date ?? row.ex_dividend_date,
+        announcement_date: row.ex_dividend_date,
         dividend_type: "regular" as const,
       }))
       .sort((a, b) => a.payment_date.localeCompare(b.payment_date));
@@ -282,8 +282,8 @@ export class DataProviderNGXPulse implements IStockDataProvider {
   }
 
   // NGX Pulse has no financials endpoint — return null so criteria handle missing data gracefully
-  async getFinancials(_symbol: StockSymbol, _marketId: MarketId): Promise<FinancialData | null> {
-    return null;
+  getFinancials(_symbol: StockSymbol, _marketId: MarketId): Promise<FinancialData | null> {
+    return Promise.resolve(null);
   }
 
   async searchStocks(query: string, limit?: number): Promise<StockSearchResult[]> {
@@ -334,7 +334,9 @@ export class DataProviderNGXPulse implements IStockDataProvider {
         if (Array.isArray(value)) return value as T[];
       }
     }
-    process.stderr.write(`[WARN] NGX Pulse: unexpected non-array response from ${path}: ${JSON.stringify(raw).slice(0, 200)}\n`);
+    process.stderr.write(
+      `[WARN] NGX Pulse: unexpected non-array response from ${path}: ${JSON.stringify(raw).slice(0, 200)}\n`
+    );
     return [];
   }
 
