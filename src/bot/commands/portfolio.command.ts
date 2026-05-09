@@ -1,6 +1,8 @@
 import { BotContext } from "../types";
 import { PortfolioService } from "../services/portfolio-service";
 import { formatPortfolio } from "../formatters/portfolio-formatter";
+import { portfolioKeyboard } from "../keyboards/portfolio.keyboard";
+import { sendTyping } from "../utils/typing";
 import { TelegramUserId } from "@/types/common";
 
 export function createPortfolioHandler(portfolioService: PortfolioService) {
@@ -11,9 +13,10 @@ export function createPortfolioHandler(portfolioService: PortfolioService) {
       return;
     }
 
+    await sendTyping(ctx);
     await ctx.replyWithHTML("<b>📂 Loading your portfolio...</b>");
 
     const holdings = await portfolioService.getHoldings(userId);
-    await ctx.replyWithHTML(formatPortfolio(holdings));
+    await ctx.replyWithHTML(formatPortfolio(holdings), portfolioKeyboard());
   };
 }

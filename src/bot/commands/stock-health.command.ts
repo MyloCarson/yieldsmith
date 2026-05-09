@@ -1,6 +1,8 @@
 import { BotContext } from "../types";
 import { StockService } from "../services/stock-service";
 import { formatStockEvaluation } from "../formatters/criterion-formatter";
+import { stockHealthKeyboard } from "../keyboards/stock.keyboard";
+import { sendTyping } from "../utils/typing";
 import { escapeHtml } from "@/utils/html";
 import { StockSymbol, MarketId } from "@/types/common";
 
@@ -24,9 +26,10 @@ export function createStockHealthHandler(stockService: StockService) {
       return;
     }
 
+    await sendTyping(ctx);
     await ctx.replyWithHTML(`<b>🔍 Analysing ${escapeHtml(String(symbol))}...</b>`);
 
     const result = await stockService.evaluateStock(symbol, marketId);
-    await ctx.replyWithHTML(formatStockEvaluation(result));
+    await ctx.replyWithHTML(formatStockEvaluation(result), stockHealthKeyboard(String(symbol)));
   };
 }

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import {
   PortfolioStock,
   PortfolioContext,
@@ -24,7 +24,7 @@ export interface GeminiAIProviderConfig {
   model?: string;
 }
 
-const DEFAULT_MODEL = "gemini-1.5-pro";
+const DEFAULT_MODEL = "gemini-2.5-pro";
 
 export class GeminiAIProvider extends BaseAIProvider {
   readonly id = "gemini";
@@ -32,12 +32,15 @@ export class GeminiAIProvider extends BaseAIProvider {
   readonly model: string;
 
   private readonly apiKey: string | undefined;
-  private genAI: GoogleGenerativeAI | null = null;
+  private client: GoogleGenAI | null = null;
 
   constructor(config?: GeminiAIProviderConfig) {
     super();
     this.apiKey =
-      config?.apiKey ?? process.env["GEMINI_API_KEY"] ?? process.env["GOOGLE_AI_API_KEY"];
+      config?.apiKey ??
+      process.env["GEMINI_API_KEY"] ??
+      process.env["GOOGLE_API_KEY"] ??
+      process.env["GOOGLE_AI_API_KEY"];
     this.model = config?.model ?? DEFAULT_MODEL;
   }
 
@@ -47,20 +50,27 @@ export class GeminiAIProvider extends BaseAIProvider {
 
   async initialize(): Promise<void> {
     await super.initialize();
-    this.genAI = new GoogleGenerativeAI(this.apiKey!);
+    this.client = new GoogleGenAI({ apiKey: this.apiKey });
   }
 
-  private getModel(): GenerativeModel {
+  private getClient(): GoogleGenAI {
     this.ensureInitialized();
-    if (!this.genAI) {
+    if (!this.client) {
       throw new AIProviderError("NOT_INITIALIZED", "Gemini client not created");
     }
-    return this.genAI.getGenerativeModel({ model: this.model });
+    return this.client;
   }
 
   private async ask(prompt: string): Promise<string> {
-    const result = await this.getModel().generateContent(prompt);
-    return result.response.text();
+    const response = await this.getClient().models.generateContent({
+      model: this.model,
+      contents: prompt,
+    });
+    const text = response.text;
+    if (!text) {
+      throw new AIProviderError("EMPTY_RESPONSE", "Gemini returned no text content");
+    }
+    return text;
   }
 
   private parseJSON<T>(raw: string): T {
@@ -110,18 +120,40 @@ Return JSON with: symbol, companyName, summary, fundamentalAnalysis, technicalAn
 
   async generateRecommendation(
     symbol: string,
-    marketId: string,
+    _marketId: string,
     criteria: CriterionResult[],
     context: RecommendationContext
   ): Promise<AIRecommendation> {
     try {
-      const prompt = `You are a dividend investment advisor. Generate a recommendation and return JSON.
+      const prompt = `You are a friendly financial advisor helping an everyday Nigerian investor who has NO finance or trading background. They invest for dividend income on the Nigerian Stock Exchange (NGX).
 
-Symbol: ${symbol} (${marketId})
-Criteria results: ${JSON.stringify(criteria, null, 2)}
+IMPORTANT: Write ALL text in plain, simple English. No jargon. No technical terms. Imagine explaining this to a smart friend who has never traded stocks before. If you must mention something like "P/E ratio", explain what it means in simple words.
+
+Stock: ${symbol} (NGX)
+Criteria check results: ${JSON.stringify(criteria, null, 2)}
 Context: ${JSON.stringify(context, null, 2)}
 
-Return JSON with: symbol, marketId, recommendation (buy|hold|sell), recommendedAmount, confidence (low|medium|high), score (0-1), reasoning{fundamental,technical,dividend,valuation,overall}, keyStrengths[], keyConcerns[], targetPrice, upside, downside, investmentHorizon, alternatives[], metadata{modelUsed,analysisDate,dataSourcesUsed[],assumptions[]}.`;
+The investor's goals: build ₦500K/year in dividend income, medium risk, 2-3 year horizon. They care about: regular dividend payments, fair pricing, company stability.
+
+Return JSON with:
+- symbol, marketId
+- recommendation: "buy", "hold", or "sell"
+- recommendedAmount: null
+- confidence: "low", "medium", or "high"
+- score: number 0-1
+- reasoning.overall: 2-3 plain sentences — the main reason for this recommendation, no jargon
+- reasoning.dividend: 1 plain sentence about dividend payments (are they reliable? growing? risky?)
+- reasoning.fundamental: 1 plain sentence about company health (is the company doing well?)
+- reasoning.valuation: 1 plain sentence about whether the stock price is fair (cheap, expensive, or just right?)
+- reasoning.technical: null
+- keyStrengths: 2-3 bullet points in plain English — what makes this a good or bad investment
+- keyConcerns: 2-3 bullet points in plain English — what risks or problems to watch out for
+- targetPrice: estimated fair price in naira (or null if unknown)
+- upside: null
+- downside: null
+- investmentHorizon: "short-term", "medium-term", or "long-term"
+- alternatives: []
+- metadata: {modelUsed: "", analysisDate: null, dataSourcesUsed: [], assumptions: []}`;
 
       const raw = await this.ask(prompt);
       const parsed = this.parseJSON<AIRecommendation>(raw);
@@ -184,9 +216,12 @@ ${JSON.stringify(indicator, null, 2)}`;
 
   async healthCheck(): Promise<HealthCheckResult> {
     try {
-      const result = await this.getModel().generateContent("ping");
+      const response = await this.getClient().models.generateContent({
+        model: this.model,
+        contents: "ping",
+      });
       return {
-        healthy: !!result.response.text(),
+        healthy: !!response.text,
         status: "operational",
         lastCheck: new Date(),
       };
@@ -208,8 +243,8 @@ ${JSON.stringify(indicator, null, 2)}`;
       supportsCriteriaValidation: true,
       supportsRiskAssessment: true,
       supportsNaturalLanguageInput: true,
-      maxTokensPerRequest: 8192,
-      supportedModels: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"],
+      maxTokensPerRequest: 65536,
+      supportedModels: ["gemini-2.5-pro", "gemini-2.5-flash"],
       concurrentRequests: 10,
     };
   }

@@ -1,5 +1,6 @@
 import { BotContext } from "../types";
 import { escapeHtml } from "@/utils/html";
+import { startKeyboard } from "../keyboards/start.keyboard";
 
 export async function handleStart(ctx: BotContext): Promise<void> {
   const firstName = escapeHtml(ctx.from?.first_name ?? "there");
@@ -11,6 +12,7 @@ export async function handleStart(ctx: BotContext): Promise<void> {
       `• Track your portfolio performance\n` +
       `• Send alerts for dividends, price moves, and rebalancing\n` +
       `• Provide AI-powered investment recommendations\n\n` +
-      `Type /help to see all available commands.`
+      `Where would you like to start?`,
+    startKeyboard()
   );
 }

@@ -1,80 +1,86 @@
-import { AIRecommendation } from "@core/ai-provider";
 import { escapeHtml } from "@/utils/html";
 import { RecommendationResult } from "../services/recommendation-service";
 
-const ACTION_ICON: Record<string, string> = {
-  buy: "✅",
-  hold: "⚠️",
-  sell: "❌",
+const ACTION_LABEL: Record<string, string> = {
+  buy: "✅ BUY",
+  hold: "⏸ HOLD",
+  sell: "🚫 SELL",
 };
 
 const CONFIDENCE_LABEL: Record<string, string> = {
-  high: "High Confidence",
-  medium: "Medium Confidence",
-  low: "Low Confidence",
+  high: "Very confident",
+  medium: "Fairly confident",
+  low: "Uncertain — do your own research",
 };
 
 export function formatRecommendation(result: RecommendationResult): string {
   const { evaluation, recommendation } = result;
   const rec = recommendation.recommendation;
-  const icon = ACTION_ICON[rec] ?? "❓";
-  const actionLabel = rec.toUpperCase();
+  const actionLabel = ACTION_LABEL[rec] ?? rec.toUpperCase();
   const confidenceLabel = CONFIDENCE_LABEL[recommendation.confidence] ?? recommendation.confidence;
-  const scorePercent = Math.round(recommendation.score * 100);
   const scoreBar = buildScoreBar(recommendation.score);
+  const scorePercent = Math.round(recommendation.score * 100);
 
   const lines: string[] = [
-    `<b>🤖 AI Recommendation — ${escapeHtml(String(evaluation.symbol))}</b>`,
+    `<b>🤖 AI Take — ${escapeHtml(String(evaluation.symbol))}</b>`,
     ``,
-    `${icon} <b>${actionLabel}</b> (${confidenceLabel})`,
-    `Score: ${scoreBar} ${scorePercent}%`,
-    `Price: ₦${evaluation.currentPrice.toLocaleString("en-NG")}`,
+    `${actionLabel}  (${escapeHtml(confidenceLabel)})`,
+    `${scoreBar} ${scorePercent}%  ·  Current price: ₦${evaluation.currentPrice.toLocaleString("en-NG")}`,
   ];
 
   if (recommendation.targetPrice) {
-    const direction = recommendation.targetPrice > evaluation.currentPrice ? "▲" : "▼";
-    lines.push(`Target: ₦${recommendation.targetPrice.toLocaleString("en-NG")} ${direction}`);
+    const upside =
+      ((recommendation.targetPrice - evaluation.currentPrice) / evaluation.currentPrice) * 100;
+    const direction = upside >= 0 ? "📈" : "📉";
+    lines.push(
+      `Fair value estimate: ₦${recommendation.targetPrice.toLocaleString("en-NG")} ${direction} (${upside >= 0 ? "+" : ""}${upside.toFixed(1)}% from now)`
+    );
   }
 
   lines.push(``);
-  lines.push(`<b>Overall:</b> ${escapeHtml(recommendation.reasoning.overall)}`);
+  lines.push(`<b>📋 Summary</b>`);
+  lines.push(escapeHtml(recommendation.reasoning.overall));
 
   if (recommendation.reasoning.dividend) {
-    lines.push(`<b>Dividend:</b> ${escapeHtml(recommendation.reasoning.dividend)}`);
+    lines.push(``);
+    lines.push(`<b>💰 Dividend outlook</b>`);
+    lines.push(escapeHtml(recommendation.reasoning.dividend));
   }
 
   if (recommendation.reasoning.fundamental) {
-    lines.push(`<b>Fundamental:</b> ${escapeHtml(recommendation.reasoning.fundamental)}`);
+    lines.push(``);
+    lines.push(`<b>🏭 Company health</b>`);
+    lines.push(escapeHtml(recommendation.reasoning.fundamental));
   }
 
   if (recommendation.reasoning.valuation) {
-    lines.push(`<b>Valuation:</b> ${escapeHtml(recommendation.reasoning.valuation)}`);
+    lines.push(``);
+    lines.push(`<b>🔍 Is it fairly priced?</b>`);
+    lines.push(escapeHtml(recommendation.reasoning.valuation));
   }
 
   if (recommendation.keyStrengths.length > 0) {
     lines.push(``);
-    lines.push(`<b>Key Strengths</b>`);
-    for (const strength of recommendation.keyStrengths) {
-      lines.push(`• ${escapeHtml(strength)}`);
+    lines.push(`<b>✅ What's good</b>`);
+    for (const s of recommendation.keyStrengths) {
+      lines.push(`• ${escapeHtml(s)}`);
     }
   }
 
   if (recommendation.keyConcerns.length > 0) {
     lines.push(``);
-    lines.push(`<b>Key Concerns</b>`);
-    for (const concern of recommendation.keyConcerns) {
-      lines.push(`• ${escapeHtml(concern)}`);
+    lines.push(`<b>⚠️ Watch out for</b>`);
+    for (const c of recommendation.keyConcerns) {
+      lines.push(`• ${escapeHtml(c)}`);
     }
   }
 
-  const metaParts: string[] = [];
   if (recommendation.investmentHorizon) {
-    metaParts.push(`Horizon: ${formatHorizon(recommendation.investmentHorizon)}`);
+    lines.push(``);
+    lines.push(
+      `<i>Best held for: ${escapeHtml(formatHorizon(recommendation.investmentHorizon))}</i>`
+    );
   }
-  metaParts.push(`Model: ${escapeHtml(recommendation.metadata.modelUsed)}`);
-
-  lines.push(``);
-  lines.push(`<i>${metaParts.join(" · ")}</i>`);
 
   return lines.join("\n");
 }
@@ -85,10 +91,11 @@ function buildScoreBar(score: number): string {
   return "█".repeat(filled) + "░".repeat(5 - filled);
 }
 
-function formatHorizon(horizon: AIRecommendation["investmentHorizon"]): string {
-  if (!horizon) return "";
-  return horizon
-    .split("-")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join("-");
+function formatHorizon(horizon: string): string {
+  const map: Record<string, string> = {
+    "short-term": "a few months",
+    "medium-term": "1–2 years",
+    "long-term": "3+ years",
+  };
+  return map[horizon] ?? horizon;
 }

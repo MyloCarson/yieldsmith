@@ -1,6 +1,8 @@
 import { BotContext } from "../types";
 import { RecommendationService } from "../services/recommendation-service";
 import { formatRecommendation } from "../formatters/recommendation-formatter";
+import { recommendKeyboard } from "../keyboards/stock.keyboard";
+import { sendTyping } from "../utils/typing";
 import { escapeHtml } from "@/utils/html";
 import { StockSymbol, MarketId } from "@/types/common";
 
@@ -24,11 +26,12 @@ export function createRecommendHandler(recommendationService: RecommendationServ
       return;
     }
 
+    await sendTyping(ctx);
     await ctx.replyWithHTML(
       `<b>🤖 Generating AI recommendation for ${escapeHtml(String(symbol))}...</b>`
     );
 
     const result = await recommendationService.getRecommendation(symbol, marketId);
-    await ctx.replyWithHTML(formatRecommendation(result));
+    await ctx.replyWithHTML(formatRecommendation(result), recommendKeyboard(String(symbol)));
   };
 }
