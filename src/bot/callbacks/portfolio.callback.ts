@@ -12,13 +12,10 @@ export function registerPortfolioCallbacks(
   bot.action(/^remove_confirm:(.+)$/, async (ctx) => {
     const symbol = ctx.match[1] as StockSymbol;
     const userId = ctx.from?.id as TelegramUserId | undefined;
-    if (!userId) {
-      await ctx.answerCbQuery();
-      return;
-    }
+    await ctx.answerCbQuery();
+    if (!userId) return;
     const existing = await portfolioService.getHoldingBySymbol(userId, symbol, "ngx" as MarketId);
     if (!existing) {
-      await ctx.answerCbQuery();
       await ctx.editMessageText(
         `<b>${escapeHtml(String(symbol))}</b> is no longer in your portfolio.`,
         { parse_mode: "HTML" }
@@ -26,7 +23,6 @@ export function registerPortfolioCallbacks(
       return;
     }
     await portfolioService.removeHolding(userId, symbol, "ngx" as MarketId);
-    await ctx.answerCbQuery("Removed.");
     await ctx.editMessageText(formatRemoveHolding(String(symbol)), { parse_mode: "HTML" });
   });
 

@@ -17,7 +17,15 @@ export function registerCallbacks(
   registerStockCallbacks(bot, stockService, recommendationService, portfolioService);
   registerPortfolioCallbacks(bot, portfolioService);
 
-  bot.on("callback_query", async (ctx) => {
-    await ctx.answerCbQuery();
+  // Safe fallback: answer any callback query not already handled by bot.action()
+  bot.use(async (ctx, next) => {
+    await next();
+    if ("callback_query" in ctx.update) {
+      try {
+        await ctx.answerCbQuery();
+      } catch {
+        // Already answered by a specific action handler — ignore
+      }
+    }
   });
 }
