@@ -55,7 +55,9 @@ export class StockService {
         this.provider.searchStocks(String(symbol), 5),
       ]);
 
-    const sector = searchResults.find((r) => r.symbol === symbol)?.sector;
+    const matchedStock = searchResults.find((r) => r.symbol === symbol);
+    const sector = matchedStock?.sector;
+    const peRatio = matchedStock?.peRatio;
 
     const context = buildCriterionContext(
       symbol,
@@ -64,7 +66,8 @@ export class StockService {
       financials,
       dividendHistory,
       historicalPrices,
-      sector
+      sector,
+      peRatio
     );
 
     const criterionNames = await this.criterionFactory.getAllAvailable();
@@ -189,7 +192,8 @@ function buildCriterionContext(
   financials: Awaited<ReturnType<IStockDataProvider["getFinancials"]>>,
   dividendHistory: Awaited<ReturnType<IStockDataProvider["getDividendHistory"]>>,
   historicalPrices: Awaited<ReturnType<IStockDataProvider["getHistoricalPrices"]>>,
-  sector?: string
+  sector?: string,
+  peRatio?: number
 ): CriterionContext {
   const latestDividend = dividendHistory.at(-1);
   const dividendYield = latestDividend
@@ -206,6 +210,7 @@ function buildCriterionContext(
   if (financials?.debt != null) extraStockFields["debt"] = financials.debt;
   if (financials?.equity != null) extraStockFields["equity"] = financials.equity;
   if (sector != null) extraStockFields["sector"] = sector;
+  if (peRatio != null && peRatio > 0) extraStockFields["peRatio"] = peRatio;
 
   // dividendPerShare from latest dividend record
   if (latestDividend != null) {

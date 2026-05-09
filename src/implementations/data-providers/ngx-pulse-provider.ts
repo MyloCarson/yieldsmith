@@ -305,6 +305,7 @@ export class DataProviderNGXPulse implements IStockDataProvider {
       marketId: "ngx" as MarketId,
       sector: s.sector ?? "Unknown",
       lastPrice: s.current_price,
+      peRatio: s.pe_ratio > 0 ? s.pe_ratio : undefined,
       timestamp: new Date(),
     }));
   }

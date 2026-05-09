@@ -120,18 +120,40 @@ Return JSON with: symbol, companyName, summary, fundamentalAnalysis, technicalAn
 
   async generateRecommendation(
     symbol: string,
-    marketId: string,
+    _marketId: string,
     criteria: CriterionResult[],
     context: RecommendationContext
   ): Promise<AIRecommendation> {
     try {
-      const prompt = `You are a dividend investment advisor. Generate a recommendation and return JSON.
+      const prompt = `You are a friendly financial advisor helping an everyday Nigerian investor who has NO finance or trading background. They invest for dividend income on the Nigerian Stock Exchange (NGX).
 
-Symbol: ${symbol} (${marketId})
-Criteria results: ${JSON.stringify(criteria, null, 2)}
+IMPORTANT: Write ALL text in plain, simple English. No jargon. No technical terms. Imagine explaining this to a smart friend who has never traded stocks before. If you must mention something like "P/E ratio", explain what it means in simple words.
+
+Stock: ${symbol} (NGX)
+Criteria check results: ${JSON.stringify(criteria, null, 2)}
 Context: ${JSON.stringify(context, null, 2)}
 
-Return JSON with: symbol, marketId, recommendation (buy|hold|sell), recommendedAmount, confidence (low|medium|high), score (0-1), reasoning{fundamental,technical,dividend,valuation,overall}, keyStrengths[], keyConcerns[], targetPrice, upside, downside, investmentHorizon, alternatives[], metadata{modelUsed,analysisDate,dataSourcesUsed[],assumptions[]}.`;
+The investor's goals: build ₦500K/year in dividend income, medium risk, 2-3 year horizon. They care about: regular dividend payments, fair pricing, company stability.
+
+Return JSON with:
+- symbol, marketId
+- recommendation: "buy", "hold", or "sell"
+- recommendedAmount: null
+- confidence: "low", "medium", or "high"
+- score: number 0-1
+- reasoning.overall: 2-3 plain sentences — the main reason for this recommendation, no jargon
+- reasoning.dividend: 1 plain sentence about dividend payments (are they reliable? growing? risky?)
+- reasoning.fundamental: 1 plain sentence about company health (is the company doing well?)
+- reasoning.valuation: 1 plain sentence about whether the stock price is fair (cheap, expensive, or just right?)
+- reasoning.technical: null
+- keyStrengths: 2-3 bullet points in plain English — what makes this a good or bad investment
+- keyConcerns: 2-3 bullet points in plain English — what risks or problems to watch out for
+- targetPrice: estimated fair price in naira (or null if unknown)
+- upside: null
+- downside: null
+- investmentHorizon: "short-term", "medium-term", or "long-term"
+- alternatives: []
+- metadata: {modelUsed: "", analysisDate: null, dataSourcesUsed: [], assumptions: []}`;
 
       const raw = await this.ask(prompt);
       const parsed = this.parseJSON<AIRecommendation>(raw);
