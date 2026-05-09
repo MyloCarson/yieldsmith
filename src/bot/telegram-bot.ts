@@ -29,7 +29,12 @@ export class TelegramBot {
     this.bot = new Telegraf<BotContext>(config.token);
     this.registerMiddleware(config);
     this.registerCommands();
-    registerCallbacks(this.bot, this.stockService, this.portfolioService, this.recommendationService);
+    registerCallbacks(
+      this.bot,
+      this.stockService,
+      this.portfolioService,
+      this.recommendationService
+    );
   }
 
   private registerMiddleware(config: BotConfig): void {

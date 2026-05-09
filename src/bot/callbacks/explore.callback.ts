@@ -9,7 +9,10 @@ import { sendTyping } from "../utils/typing";
 const PAGE_SIZE = 3;
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
-const exploreCache = new Map<number, { candidates: ExploreCandidate[]; timer: ReturnType<typeof setTimeout> }>();
+const exploreCache = new Map<
+  number,
+  { candidates: ExploreCandidate[]; timer: ReturnType<typeof setTimeout> }
+>();
 
 export function setExploreCache(userId: number, candidates: ExploreCandidate[]): void {
   const existing = exploreCache.get(userId);
